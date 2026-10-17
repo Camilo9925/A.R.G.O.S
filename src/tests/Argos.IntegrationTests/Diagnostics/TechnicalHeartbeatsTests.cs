@@ -1,12 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
-using Argos.Application.Common.Abstractions;
 using Argos.Contracts.Access;
 using Argos.Contracts.Realtime;
 using Argos.IntegrationTests.Infrastructure;
-using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Argos.IntegrationTests.Diagnostics;
 
@@ -17,7 +14,7 @@ namespace Argos.IntegrationTests.Diagnostics;
 /// </summary>
 public sealed class TechnicalHeartbeatsTests(ApiFixture fixture) : IntegrationTestBase(fixture)
 {
-    private const string HeartbeatsPath = "/api/diagnostics/heartbeats";
+    public const string HeartbeatsPath = "/api/diagnostics/heartbeats";
     private static readonly TimeSpan DeliveryTimeout = TimeSpan.FromSeconds(10);
 
     [Fact]
@@ -26,29 +23,15 @@ public sealed class TechnicalHeartbeatsTests(ApiFixture fixture) : IntegrationTe
         var cancellationToken = TestContext.Current.CancellationToken;
         var received = new TaskCompletionSource<TechnicalHeartbeatNotification>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        // O handler do TestServer não aceita WebSockets; o long polling exercita o mesmo hub.
-        await using var connection = new HubConnectionBuilder()
-            .WithUrl(new Uri(Fixture.Factory.Server.BaseAddress, OperationsHubContract.Path), options =>
-            {
-                options.HttpMessageHandlerFactory = _ => Fixture.Factory.Server.CreateHandler();
-                options.Transports = HttpTransportType.LongPolling;
-                options.AccessTokenProvider = () => Task.FromResult<string?>(IssueOperatorToken());
-            })
-            .Build();
+        await using var connection = Fixture.CreateHubConnection(Fixture.Tokens.For(UserRoles.Operator));
         connection.On<TechnicalHeartbeatNotification>(
             OperationsHubContract.Messages.TechnicalHeartbeatReceived,
             notification => received.TrySetResult(notification));
-        await connection.StartAsync(cancellationToken);
+        await connection.StartAndSynchronizeAsync(cancellationToken);
 
-        var heartbeat = new TechnicalHeartbeat
-        {
-            Source = "integration-test",
-            Sequence = 7,
-            SentAt = new DateTimeOffset(2026, 10, 17, 12, 0, 0, TimeSpan.Zero),
-        };
+        var heartbeat = NewHeartbeat();
 
-        using var client = Fixture.Factory.CreateClient();
-        client.DefaultRequestHeaders.Add(SystemKeyContract.HeaderName, ApiFixture.SystemKey);
+        using var client = Fixture.CreateSystemClient();
         using var response = await client.PostAsJsonAsync(HeartbeatsPath, heartbeat, cancellationToken);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
@@ -60,8 +43,10 @@ public sealed class TechnicalHeartbeatsTests(ApiFixture fixture) : IntegrationTe
         Assert.Equal(TimeSpan.Zero, notification.ReceivedAt.Offset);
     }
 
-    private string IssueOperatorToken() =>
-        Fixture.Factory.Services.GetRequiredService<IAccessTokenIssuer>()
-            .Issue(new AccessTokenSubject(Guid.NewGuid(), "operador", "Operador de Teste", UserRoles.Operator))
-            .Value;
+    public static TechnicalHeartbeat NewHeartbeat() => new()
+    {
+        Source = "integration-test",
+        Sequence = 7,
+        SentAt = new DateTimeOffset(2026, 10, 17, 12, 0, 0, TimeSpan.Zero),
+    };
 }

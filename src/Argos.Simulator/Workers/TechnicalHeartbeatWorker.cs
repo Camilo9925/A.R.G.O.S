@@ -1,3 +1,4 @@
+using System.Net;
 using Argos.Contracts.Realtime;
 using Argos.Simulation.Configuration;
 using Argos.Simulation.Generators;
@@ -74,12 +75,24 @@ internal sealed class TechnicalHeartbeatWorker(
                     return;
                 }
 
+                if (!IsTransient(status))
+                {
+                    // Erro do próprio envio: repetir não resolve, então o sinal é descartado.
+                    logger.LogError(
+                        "Sinal de vida {Sequence} recusado pela API: {StatusCode} ({Status}). Sinal descartado.",
+                        sequence,
+                        (int)status,
+                        status);
+                    return;
+                }
+
                 logger.LogWarning(
-                    "Sinal de vida {Sequence} recusado pela API: {StatusCode} ({Status}). Tentativa {Attempt}.",
-                    sequence,
+                    "API respondeu {StatusCode} ({Status}) ao sinal de vida {Sequence}. Tentativa {Attempt}; nova tentativa em {RetrySeconds} s.",
                     (int)status,
                     status,
-                    attempt);
+                    sequence,
+                    attempt,
+                    retryDelay.TotalSeconds);
             }
             catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException
                 && !stoppingToken.IsCancellationRequested)
@@ -96,4 +109,11 @@ internal sealed class TechnicalHeartbeatWorker(
             retryDelay = TimeSpan.FromTicks(Math.Min(retryDelay.Ticks * 2, MaxRetryDelay.Ticks));
         }
     }
+
+    /// <summary>
+    /// Falhas que podem passar sozinhas: 5xx, 408 (tempo esgotado) e 429 (excesso de requisições).
+    /// </summary>
+    private static bool IsTransient(HttpStatusCode status) =>
+        (int)status >= 500
+        || status is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests;
 }

@@ -1,0 +1,10 @@
+# Saídas de build
+**/bin/
+**/obj/
+
+# Documentos SDD e arquivos-fonte da marca (locais, não versionados; Art. XV.3)
+specs/
+assets/
+
+# Segredos
+.env

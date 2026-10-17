@@ -1,3 +1,4 @@
+using Argos.Domain.Access;
 using Microsoft.EntityFrameworkCore;
 
 namespace Argos.Infrastructure.Persistence;
@@ -8,6 +9,8 @@ namespace Argos.Infrastructure.Persistence;
 internal sealed class ArgosDbContext(DbContextOptions<ArgosDbContext> options) : DbContext(options)
 {
     public DbSet<SeedHistoryEntry> SeedHistory => Set<SeedHistoryEntry>();
+
+    public DbSet<User> Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

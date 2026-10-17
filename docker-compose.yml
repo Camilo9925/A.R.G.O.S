@@ -32,6 +32,13 @@ services:
       DOTNET_ENVIRONMENT: Demo
       ConnectionStrings__Argos: *connection-string
       Simulation__Seed: ${SIMULATION_SEED:-42}
+      # Usuários de demonstração, reconciliados a cada subida (D-40); os nomes vêm do appsettings.json do Migrator.
+      DemoUsers__Administrator__Login: ${DEMO_ADMIN_LOGIN:?Defina DEMO_ADMIN_LOGIN no .env}
+      DemoUsers__Administrator__Password: ${DEMO_ADMIN_PASSWORD:?Defina DEMO_ADMIN_PASSWORD no .env}
+      DemoUsers__Operator__Login: ${DEMO_OPERATOR_LOGIN:?Defina DEMO_OPERATOR_LOGIN no .env}
+      DemoUsers__Operator__Password: ${DEMO_OPERATOR_PASSWORD:?Defina DEMO_OPERATOR_PASSWORD no .env}
+      DemoUsers__Manager__Login: ${DEMO_MANAGER_LOGIN:?Defina DEMO_MANAGER_LOGIN no .env}
+      DemoUsers__Manager__Password: ${DEMO_MANAGER_PASSWORD:?Defina DEMO_MANAGER_PASSWORD no .env}
     depends_on:
       db:
         condition: service_healthy
@@ -43,6 +50,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Demo
       ConnectionStrings__Argos: *connection-string
+      Jwt__SigningKey: ${ARGOS_JWT_SIGNING_KEY:?Defina ARGOS_JWT_SIGNING_KEY no .env}
+      SystemKey__Key: ${ARGOS_SYSTEM_KEY:?Defina ARGOS_SYSTEM_KEY no .env}
     ports:
       - "8081:8080"
     healthcheck:
@@ -64,6 +73,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Demo
       Simulation__Seed: ${SIMULATION_SEED:-42}
       Simulator__HeartbeatIntervalSeconds: ${HEARTBEAT_INTERVAL_SECONDS:-5}
+      Simulator__SystemKey: ${ARGOS_SYSTEM_KEY:?Defina ARGOS_SYSTEM_KEY no .env}
     ports:
       - "8082:8080"
     healthcheck:
@@ -81,6 +91,15 @@ services:
     build:
       context: .
       dockerfile: src/Argos.Web/Dockerfile
+    environment:
+      # Só aqui o preenchimento rápido do login é ligado (D-41); a imagem vem com Production.
+      ARGOS_ENVIRONMENT: Demo
+      DEMO_ADMIN_LOGIN: ${DEMO_ADMIN_LOGIN:?Defina DEMO_ADMIN_LOGIN no .env}
+      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:?Defina DEMO_ADMIN_PASSWORD no .env}
+      DEMO_OPERATOR_LOGIN: ${DEMO_OPERATOR_LOGIN:?Defina DEMO_OPERATOR_LOGIN no .env}
+      DEMO_OPERATOR_PASSWORD: ${DEMO_OPERATOR_PASSWORD:?Defina DEMO_OPERATOR_PASSWORD no .env}
+      DEMO_MANAGER_LOGIN: ${DEMO_MANAGER_LOGIN:?Defina DEMO_MANAGER_LOGIN no .env}
+      DEMO_MANAGER_PASSWORD: ${DEMO_MANAGER_PASSWORD:?Defina DEMO_MANAGER_PASSWORD no .env}
     ports:
       - "8080:80"
     healthcheck:

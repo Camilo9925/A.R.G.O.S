@@ -5,6 +5,11 @@ body {
   margin: 0;
 }
 
+/* O FocusOnNavigate continua levando o foco ao título a cada navegação (leitores de tela); só o contorno é ocultado. */
+h1:focus {
+  outline: none;
+}
+
 /* Carregamento inicial, antes do Blazor assumir: tema escuro padrão (Art. X.4). */
 .argos-loading {
   display: flex;

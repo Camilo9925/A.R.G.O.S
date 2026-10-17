@@ -10,19 +10,20 @@ const attribution =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors';
 
 // Cores da paleta ARGOS (Art. XI.1) por tema e classe de via, na ordem de desenho de streets.json.
-// Ruas discretas, para que os marcadores de situação se destaquem sobre elas (Art. VII.2).
+// Ruas discretas, todas no mesmo cinza-azulado, para que os marcadores de situação se destaquem sobre elas
+// (Art. VII.2). O ciano fica reservado para seleção e interação.
 const streetStyles = {
   dark: {
     minor: { color: "#E8EEF5", opacity: 0.14 },
     local: { color: "#E8EEF5", opacity: 0.26 },
     secondary: { color: "#E8EEF5", opacity: 0.42 },
-    major: { color: "#00C2FF", opacity: 0.55 },
+    major: { color: "#E8EEF5", opacity: 0.55 },
   },
   light: {
     minor: { color: "#0B1E3F", opacity: 0.14 },
     local: { color: "#0B1E3F", opacity: 0.26 },
     secondary: { color: "#0B1E3F", opacity: 0.42 },
-    major: { color: "#00C2FF", opacity: 0.9 },
+    major: { color: "#0B1E3F", opacity: 0.5 },
   },
 };
 

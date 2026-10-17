@@ -1,3 +1,4 @@
+using Argos.Contracts.Access;
 using Argos.Simulation.Configuration;
 using Argos.Simulator.Clients;
 using Argos.Simulator.Configuration;
@@ -31,6 +32,7 @@ builder.Services.AddHttpClient<ArgosApiClient>((serviceProvider, client) =>
     var options = serviceProvider.GetRequiredService<IOptions<SimulatorOptions>>().Value;
     client.BaseAddress = new Uri(options.ApiBaseUrl.TrimEnd('/') + "/");
     client.Timeout = TimeSpan.FromSeconds(10);
+    client.DefaultRequestHeaders.Add(SystemKeyContract.HeaderName, options.SystemKey);
 });
 
 builder.Services.AddHostedService<TechnicalHeartbeatWorker>();

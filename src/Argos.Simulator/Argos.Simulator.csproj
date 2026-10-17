@@ -2,6 +2,11 @@
 
   <!-- Faz o papel do PROMETHEUS: fala com o ARGOS só pela API, nunca pelo banco (plan 2.3, D-31). -->
 
+  <!-- Chave de sistema local por user-secrets em Development (D-45). -->
+  <PropertyGroup>
+    <UserSecretsId>argos-simulator</UserSecretsId>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Argos.Contracts\Argos.Contracts.csproj" />
     <ProjectReference Include="..\Argos.Simulation\Argos.Simulation.csproj" />

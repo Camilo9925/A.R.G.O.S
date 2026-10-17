@@ -17,6 +17,11 @@ internal sealed class SimulatorOptions
     [StringLength(100, ErrorMessage = "Simulator:Source deve ter no máximo {1} caracteres.")]
     public string Source { get; set; } = "argos-simulator";
 
+    /// <summary>Chave de sistema enviada em toda requisição à API, que identifica o PROMETHEUS (D-34).</summary>
+    [Required(ErrorMessage = "Informe Simulator:SystemKey (ARGOS_SYSTEM_KEY no .env, ou user-secrets em desenvolvimento).")]
+    [MinLength(32, ErrorMessage = "Simulator:SystemKey deve ter no mínimo {1} caracteres.")]
+    public string SystemKey { get; set; } = string.Empty;
+
     [Range(1, 3600, ErrorMessage = "Simulator:HeartbeatIntervalSeconds deve estar entre {1} e {2}.")]
     public int HeartbeatIntervalSeconds { get; set; } = 5;
 }

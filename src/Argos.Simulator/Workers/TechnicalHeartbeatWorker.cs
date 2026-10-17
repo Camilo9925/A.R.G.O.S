@@ -75,6 +75,18 @@ internal sealed class TechnicalHeartbeatWorker(
                     return;
                 }
 
+                if (status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                {
+                    // Configuração, não falha passageira: o sinal é descartado e o próximo ciclo tenta de novo.
+                    logger.LogError(
+                        "Chave de sistema recusada pela API ao enviar o sinal de vida {Sequence}: {StatusCode} ({Status}). "
+                            + "Confira Simulator:SystemKey (ARGOS_SYSTEM_KEY). Sinal descartado.",
+                        sequence,
+                        (int)status,
+                        status);
+                    return;
+                }
+
                 if (!IsTransient(status))
                 {
                     // Erro do próprio envio: repetir não resolve, então o sinal é descartado.

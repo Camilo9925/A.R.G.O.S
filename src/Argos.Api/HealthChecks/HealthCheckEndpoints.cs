@@ -4,6 +4,7 @@ namespace Argos.Api.HealthChecks;
 
 /// <summary>
 /// Health checks da API (plan 7.3). A resposta traz o estado em texto: <c>Healthy</c> ou <c>Unhealthy</c> (503).
+/// São anônimos: o healthcheck do Compose não tem credencial (D-33).
 /// </summary>
 internal static class HealthCheckEndpoints
 {
@@ -13,10 +14,10 @@ internal static class HealthCheckEndpoints
     public static IEndpointRouteBuilder MapArgosHealthChecks(this IEndpointRouteBuilder endpoints)
     {
         // Vivo: o processo responde, sem consultar dependências.
-        endpoints.MapHealthChecks(LivePath, new HealthCheckOptions { Predicate = _ => false });
+        endpoints.MapHealthChecks(LivePath, new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
 
         // Pronto: todos os checks registrados, incluindo o do banco (AddInfrastructure).
-        endpoints.MapHealthChecks(ReadyPath);
+        endpoints.MapHealthChecks(ReadyPath).AllowAnonymous();
 
         return endpoints;
     }

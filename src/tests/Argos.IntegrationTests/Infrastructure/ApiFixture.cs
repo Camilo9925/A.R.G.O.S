@@ -14,6 +14,11 @@ public sealed class ApiFixture : IAsyncLifetime
 {
     private const string TestingEnvironment = "Testing";
 
+    /// <summary>Chave de sistema de teste (D-34); fictícia, só existe neste projeto.</summary>
+    public const string SystemKey = "chave-de-sistema-de-teste-com-32-caracteres-ou-mais";
+
+    private const string JwtSigningKey = "chave-de-assinatura-de-teste-com-32-caracteres-ou-mais";
+
     private readonly PostgreSqlContainer _database = new PostgreSqlBuilder("postgres:17").Build();
 
     private WebApplicationFactory<Program>? _factory;
@@ -27,7 +32,9 @@ public sealed class ApiFixture : IAsyncLifetime
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder
             .UseEnvironment(TestingEnvironment)
-            .UseSetting("ConnectionStrings:Argos", _database.GetConnectionString()));
+            .UseSetting("ConnectionStrings:Argos", _database.GetConnectionString())
+            .UseSetting("Jwt:SigningKey", JwtSigningKey)
+            .UseSetting("SystemKey:Key", SystemKey));
 
         await using var scope = _factory.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<IDatabaseMigrator>().MigrateAsync();

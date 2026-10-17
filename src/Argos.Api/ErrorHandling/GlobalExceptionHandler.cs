@@ -18,6 +18,8 @@ internal sealed class GlobalExceptionHandler(
         var problem = exception switch
         {
             ValidationFailedException validation => ValidationProblems.Create(validation.Errors),
+            AuthenticationFailedException =>
+                Problem(StatusCodes.Status401Unauthorized, ProblemTitles.Unauthenticated, exception.Message),
             NotFoundException => Problem(StatusCodes.Status404NotFound, ProblemTitles.NotFound, exception.Message),
             ConflictException => Problem(StatusCodes.Status409Conflict, ProblemTitles.Conflict, exception.Message),
             BusinessRuleException or DomainException =>

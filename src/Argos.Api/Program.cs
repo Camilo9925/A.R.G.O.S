@@ -1,3 +1,5 @@
+using Argos.Api.Authentication;
+using Argos.Api.Authorization;
 using Argos.Api.Configuration;
 using Argos.Api.ErrorHandling;
 using Argos.Api.HealthChecks;
@@ -30,7 +32,9 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<ICurrentActor, SystemCurrentActor>();
+
+builder.Services.AddArgosAuthentication(builder.Configuration);
+builder.Services.AddArgosAuthorization();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString);
@@ -81,8 +85,13 @@ if (app.Environment.IsDevelopment())
         .AllowCredentials());
 }
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapControllers();
-app.MapHub<OperationsHub>(OperationsHubContract.Path);
+
+// O hub fecha a conexão quando o token expira; a Web trata isso como fim de sessão (D-37).
+app.MapHub<OperationsHub>(OperationsHubContract.Path, options => options.CloseOnAuthenticationExpiration = true);
 app.MapArgosHealthChecks();
 app.MapArgosOpenApi();
 

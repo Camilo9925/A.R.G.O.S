@@ -23,6 +23,7 @@ public sealed class TechnicalHeartbeatService(IRealtimeNotifier notifier, TimePr
             timeProvider.GetUtcNow());
 
         return notifier.PublishAsync(
+            RealtimeAudience.Everyone,
             OperationsHubContract.Messages.TechnicalHeartbeatReceived,
             notification,
             cancellationToken);

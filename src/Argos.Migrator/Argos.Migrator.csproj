@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Execução única: aplica as migrations e registra o seed (plan 5.3, 7.4). Infrastructure só para DI e migração. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Argos.Application\Argos.Application.csproj" />
+    <ProjectReference Include="..\Argos.Infrastructure\Argos.Infrastructure.csproj" />
+    <ProjectReference Include="..\Argos.Simulation\Argos.Simulation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

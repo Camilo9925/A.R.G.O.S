@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Contratos compartilhados entre API, Web e Simulador: sem dependências (plan 2.2). -->
+
+</Project>

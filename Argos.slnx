@@ -1,4 +1,8 @@
 <Solution>
-  <Folder Name="/src/" />
+  <Folder Name="/src/">
+    <Project Path="src/Argos.Contracts/Argos.Contracts.csproj" />
+    <Project Path="src/Argos.Domain/Argos.Domain.csproj" />
+    <Project Path="src/Argos.Simulation/Argos.Simulation.csproj" />
+  </Folder>
   <Folder Name="/src/tests/" />
 </Solution>

@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Motor de simulação determinístico: sem dependências e sem I/O (Art. IX.3, plan 2.2). -->
+
+</Project>

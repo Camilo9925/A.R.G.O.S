@@ -8,6 +8,7 @@
     <Project Path="src/Argos.Migrator/Argos.Migrator.csproj" />
     <Project Path="src/Argos.Simulation/Argos.Simulation.csproj" />
     <Project Path="src/Argos.Simulator/Argos.Simulator.csproj" />
+    <Project Path="src/Argos.Web/Argos.Web.csproj" />
   </Folder>
   <Folder Name="/src/tests/" />
 </Solution>

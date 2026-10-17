@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ARGOS</title>
+    <base href="/" />
+    <link rel="preload" id="webassembly" />
+    <link rel="icon" type="image/png" sizes="32x32" href="images/brand/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="images/brand/favicon-192.png" />
+    <link rel="stylesheet" href="lib/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="lib/leaflet.markercluster/MarkerCluster.css" />
+    <link rel="stylesheet" href="lib/leaflet.markercluster/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <script type="importmap"></script>
+</head>
+
+<body>
+    <div id="app">
+        <div class="argos-loading" role="status">
+            <svg class="loading-progress" aria-hidden="true">
+                <circle r="40%" cx="50%" cy="50%" />
+                <circle r="40%" cx="50%" cy="50%" />
+            </svg>
+            <p>Carregando o ARGOS…</p>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui" role="alert">
+        Ocorreu um erro inesperado na interface.
+        <a href="." class="reload">Recarregar a página</a>
+        <button type="button" class="dismiss" aria-label="Fechar aviso">×</button>
+    </div>
+
+    <script src="lib/leaflet/leaflet.js"></script>
+    <script src="lib/leaflet.markercluster/leaflet.markercluster.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+</body>
+
+</html>

@@ -1,0 +1,18 @@
+@* Página ainda não implementada: diz o que virá e orienta o próximo passo (Art. X.6). *@
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    <MudText Typo="Typo.h4" HtmlTag="h1" GutterBottom="true">@Title</MudText>
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Construction">
+        <MudText Typo="Typo.subtitle1"><strong>Em construção.</strong></MudText>
+        <MudText>@Description</MudText>
+        <MudText Class="mt-2">Enquanto isso, acompanhe a operação em tempo real na <MudLink Href="">Central de Operações</MudLink>.</MudText>
+    </MudAlert>
+</MudContainer>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Description { get; set; } = string.Empty;
+}

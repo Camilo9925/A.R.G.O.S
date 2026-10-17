@@ -1,0 +1,42 @@
+@using Argos.Web.Services.Realtime
+@implements IDisposable
+@inject RealtimeConnection Realtime
+@inject DisplayTime DisplayTime
+
+@* Estado do tempo real com ícone e texto, nunca só cor (Art. V.4, X.2). *@
+<div class="argos-connection" role="status" aria-live="polite">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+        <MudIcon Icon="@_view.Icon" Color="@_view.Color" Size="Size.Small" />
+        <MudText Typo="Typo.body2">@_view.Label</MudText>
+    </MudStack>
+    <MudText Typo="Typo.caption" Class="argos-connection-last">
+        Último sinal do simulador: @(Realtime.LastHeartbeat is { } heartbeat ? DisplayTime.FormatTime(heartbeat.ReceivedAt) : "aguardando")
+    </MudText>
+</div>
+
+@code {
+    private (string Icon, Color Color, string Label) _view;
+
+    protected override void OnInitialized()
+    {
+        Realtime.Changed += OnRealtimeChanged;
+        Realtime.Start();
+        _view = Describe(Realtime.State);
+    }
+
+    private void OnRealtimeChanged() => InvokeAsync(() =>
+    {
+        _view = Describe(Realtime.State);
+        StateHasChanged();
+    });
+
+    private static (string Icon, Color Color, string Label) Describe(RealtimeConnectionState state) => state switch
+    {
+        RealtimeConnectionState.Connected => (Icons.Material.Filled.CheckCircle, Color.Success, "Conectado"),
+        RealtimeConnectionState.Reconnecting => (Icons.Material.Filled.Sync, Color.Warning, "Reconectando…"),
+        RealtimeConnectionState.Interrupted => (Icons.Material.Filled.CloudOff, Color.Error, "Tempo real interrompido"),
+        _ => (Icons.Material.Filled.HourglassEmpty, Color.Default, "Conectando…"),
+    };
+
+    public void Dispose() => Realtime.Changed -= OnRealtimeChanged;
+}

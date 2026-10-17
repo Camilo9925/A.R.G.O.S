@@ -1,0 +1,15 @@
+streets.json: mapa base próprio da Central (D-08), só com a geometria e a classe das vias. Sem nomes.
+Fonte: OpenStreetMap, via Overpass API (https://overpass-api.de/api/interpreter), extraído manualmente uma única vez.
+Data dos dados: 2026-10-17 (timestamp_osm_base 2026-10-17T18:43:20Z).
+Licença: Open Database License (ODbL) 1.0, https://opendatacommons.org/licenses/odbl/1-0/.
+         Este arquivo é uma base de dados derivada e segue sob a ODbL. Atribuição: © OpenStreetMap contributors
+         (https://www.openstreetmap.org/copyright), exibida no próprio mapa.
+Consulta: [out:json];way["highway"](-22.255,-49.705,-22.175,-49.605);out tags geom;
+Conversão:
+  - coordenadas arredondadas para 5 casas decimais (~1 m), pontos repetidos removidos;
+  - vias recortadas na caixa da consulta (cada trecho mantém um ponto de fora para chegar à borda);
+  - classes de desenho: major = motorway, trunk, primary (e *_link); secondary = secondary, tertiary (e *_link);
+    local = residential, unclassified, living_street, road; minor = service, track, pedestrian;
+  - ignoradas: footway, path, raceway e demais valores de highway (vias não carroçáveis).
+Formato: {"bounds":[[S,W],[N,E]], "classes":[...], "ways":[[índice da classe, lat, lon, lat, lon, ...], ...]}
+Para atualizar: repetir a consulta e a conversão acima e substituir streets.json e este arquivo (plan 9.7).

@@ -1,0 +1,6 @@
+Leaflet.markercluster 1.5.3 (licença MIT, ver MIT-LICENCE.txt)
+Origem: pacote de distribuição publicado no npm, baixado manualmente em 2026-10-17
+URL: https://registry.npmjs.org/leaflet.markercluster/-/leaflet.markercluster-1.5.3.tgz
+Integridade do pacote: sha512-vPTw/Bndq7eQHjLBVlWpnGeLa3t+3zGiuM7fJwCkiMFq+nmRuG3RI3f7f4N4TDX7T4NpbAXpR2+NTRSEGfCSeA==
+Arquivos copiados de package/: dist/leaflet.markercluster.js, dist/MarkerCluster.css, dist/MarkerCluster.Default.css, MIT-LICENCE.txt
+Para atualizar: substituir esta pasta pela de outra versão fixa e atualizar este arquivo (plan 9.7).

@@ -1,0 +1,41 @@
+@using Argos.Web.Interop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+@inject MapOptions Options
+
+@* Mapa base próprio, só com as ruas e sem rótulos, recolorido junto com o tema (Art. X.4; D-08). *@
+<div @ref="_element" class="argos-map" role="region" aria-label="Mapa da cidade"></div>
+
+@code {
+    private ElementReference _element;
+    private LeafletMapInterop? _interop;
+    private bool _renderedDarkMode;
+
+    [CascadingParameter(Name = "IsDarkMode")]
+    public bool IsDarkMode { get; set; } = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _interop = new LeafletMapInterop(JSRuntime);
+            await _interop.CreateAsync(_element, Options.CenterLatitude, Options.CenterLongitude, Options.Zoom, IsDarkMode);
+            _renderedDarkMode = IsDarkMode;
+            return;
+        }
+
+        if (_interop is not null && _renderedDarkMode != IsDarkMode)
+        {
+            await _interop.SetDarkModeAsync(IsDarkMode);
+            _renderedDarkMode = IsDarkMode;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_interop is not null)
+        {
+            await _interop.DisposeAsync();
+        }
+    }
+}

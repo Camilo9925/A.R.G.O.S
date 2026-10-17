@@ -1,0 +1,137 @@
+/* Ajustes finos sobre o tema MudBlazor (plan 3). As cores vêm do tema, na paleta ARGOS (Art. XI.1). */
+
+html,
+body {
+  margin: 0;
+}
+
+/* Carregamento inicial, antes do Blazor assumir: tema escuro padrão (Art. X.4). */
+.argos-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: #0B1E3F;
+  color: #E8EEF5;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.loading-progress {
+  width: 6rem;
+  height: 6rem;
+}
+
+.loading-progress circle {
+  fill: none;
+  stroke: rgba(232, 238, 245, 0.16);
+  stroke-width: 0.5rem;
+  transform-origin: 50% 50%;
+  transform: rotate(-90deg);
+}
+
+.loading-progress circle:last-child {
+  stroke: #00C2FF;
+  stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
+  transition: stroke-dasharray 0.05s ease-in-out;
+}
+
+#blazor-error-ui {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 2000;
+  box-sizing: border-box;
+  padding: 0.75rem 1.25rem;
+  background: #FF7A1A;
+  color: #0B1E3F;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+#blazor-error-ui .reload {
+  color: #0B1E3F;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+#blazor-error-ui .dismiss {
+  position: absolute;
+  right: 0.75rem;
+  top: 0.4rem;
+  border: none;
+  background: none;
+  color: #0B1E3F;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+/* Cópia derivada da marca, só redimensionada (Art. XI.3); o arredondamento é feito aqui, sem alterar a imagem. */
+.argos-brand-symbol {
+  border-radius: 8px;
+  margin-right: 0.75rem;
+}
+
+.argos-brand-name {
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.argos-operations {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--mud-appbar-height));
+}
+
+.argos-operations-title {
+  padding: 0.75rem 1rem;
+}
+
+.argos-map {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Mapa base próprio (D-08): fundo liso na cor do tema; as ruas são desenhadas pelo js/map.js. */
+.argos-map.leaflet-container {
+  background: var(--mud-palette-background);
+  font-family: inherit;
+}
+
+.argos-map .leaflet-control-attribution {
+  background: var(--mud-palette-surface);
+  color: var(--mud-palette-text-primary);
+}
+
+.argos-map .leaflet-bar a,
+.argos-map .leaflet-bar a:hover {
+  background-color: var(--mud-palette-surface);
+  color: var(--mud-palette-text-primary);
+  border-bottom-color: var(--mud-palette-lines-default);
+}
+
+.argos-map .leaflet-control-attribution a {
+  color: var(--mud-palette-primary);
+}
+
+.argos-map-notice {
+  max-width: 18rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  background: var(--mud-palette-surface);
+  color: var(--mud-palette-text-primary);
+  border-left: 4px solid #FF7A1A;
+}
+
+.argos-connection {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-right: 1rem;
+  line-height: 1.2;
+}
+
+.argos-connection-last {
+  opacity: 0.85;
+}

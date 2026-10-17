@@ -1,0 +1,61 @@
+@inherits LayoutComponentBase
+@inject ThemePreference ThemePreference
+
+<MudThemeProvider Theme="ArgosTheme.Theme" IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Inherit"
+                       Edge="Edge.Start"
+                       OnClick="ToggleDrawer"
+                       aria-label="Abrir ou fechar o menu" />
+        <img src="images/brand/argos-symbol-128.png" alt="" aria-hidden="true" width="36" height="36" class="argos-brand-symbol" />
+        <MudText Typo="Typo.h6" Class="argos-brand-name">ARGOS</MudText>
+        <MudSpacer />
+        <ConnectionIndicator />
+        <MudTooltip Text="@ThemeToggleLabel">
+            <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                           Color="Color.Inherit"
+                           OnClick="ToggleThemeAsync"
+                           aria-label="@ThemeToggleLabel" />
+        </MudTooltip>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="1">
+        <MudNavMenu>
+            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Radar">Central</MudNavLink>
+            <MudNavLink Href="inventory" Icon="@Icons.Material.Filled.Inventory2">Inventário</MudNavLink>
+            <MudNavLink Href="predictive" Icon="@Icons.Material.Filled.Insights">Preditiva</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent>
+        <CascadingValue Value="_isDarkMode" Name="IsDarkMode">
+            @Body
+        </CascadingValue>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _isDarkMode = true;
+    private bool _drawerOpen = true;
+
+    private string ThemeToggleLabel => _isDarkMode ? "Usar tema claro" : "Usar tema escuro";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isDarkMode = await ThemePreference.LoadIsDarkModeAsync();
+    }
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    private async Task ToggleThemeAsync()
+    {
+        _isDarkMode = !_isDarkMode;
+        await ThemePreference.SaveAsync(_isDarkMode);
+    }
+}

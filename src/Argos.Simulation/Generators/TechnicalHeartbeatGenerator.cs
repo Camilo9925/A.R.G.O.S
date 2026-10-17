@@ -1,4 +1,5 @@
 using Argos.Simulation.Configuration;
+using Argos.Simulation.Models;
 
 namespace Argos.Simulation.Generators;
 
@@ -26,8 +27,3 @@ public sealed class TechnicalHeartbeatGenerator
         return new SimulatedHeartbeat(_sequence, jitter);
     }
 }
-
-/// <summary>
-/// Sinal de vida gerado: número de sequência (a partir de 1) e atraso simulado antes do envio.
-/// </summary>
-public sealed record SimulatedHeartbeat(long Sequence, TimeSpan Jitter);

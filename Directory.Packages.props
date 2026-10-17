@@ -6,6 +6,10 @@
 
   <!-- Dependências justificadas na tabela 9.7 do plan.md (Art. III.10). -->
 
+  <ItemGroup Label="Application">
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
+  </ItemGroup>
+
   <ItemGroup Label="Infrastructure">
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13" />

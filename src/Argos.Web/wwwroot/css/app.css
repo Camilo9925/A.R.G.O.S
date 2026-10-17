@@ -140,3 +140,33 @@ h1:focus {
 .argos-connection-last {
   opacity: 0.85;
 }
+
+/* Tela de login (plan 14.11): cartão centralizado no fundo do tema. */
+.argos-login-layout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1rem;
+  box-sizing: border-box;
+  background-color: var(--mud-palette-background);
+}
+
+.argos-login {
+  width: 100%;
+  max-width: 28rem;
+}
+
+/* Usuários de demonstração (RF-053): um cartão por perfil, lado a lado quando houver espaço. */
+.argos-demo-users {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.75rem;
+}
+
+/* Usuário no cabeçalho: nome e perfil em duas linhas. */
+.argos-user-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}

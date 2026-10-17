@@ -1,0 +1,8 @@
+@inject NavigationManager Navigation
+
+@* Sem sessão: vai ao login e volta depois à página pedida (plan 14.11). *@
+
+@code {
+    protected override void OnInitialized() =>
+        Navigation.NavigateTo(LoginPaths.ForCurrentPage(Navigation), replace: true);
+}

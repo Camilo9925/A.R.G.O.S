@@ -1,0 +1,164 @@
+@page "/login"
+@layout LoginLayout
+@attribute [AllowAnonymous]
+
+@using System.Text.Json
+@using Argos.Web.Services.Api
+@inject HttpClient Http
+@inject SessionService Session
+@inject SessionStore SessionStore
+@inject NavigationManager Navigation
+@inject DemoLoginOptions DemoLogin
+
+<PageTitle>Entrar · ARGOS</PageTitle>
+
+<MudPaper Class="argos-login pa-6" Elevation="2">
+    <MudStack AlignItems="AlignItems.Center" Spacing="1" Class="mb-4">
+        <img src="images/brand/argos-symbol-128.png" alt="" aria-hidden="true" width="64" height="64" class="argos-brand-symbol" />
+        <MudText Typo="Typo.h4" HtmlTag="h1">ARGOS</MudText>
+        <MudText Typo="Typo.body2" Align="Align.Center">Entre com seu usuário para acessar a Central de Operações.</MudText>
+    </MudStack>
+
+    @if (Notice is not null)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3">@Notice</MudAlert>
+    }
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-3" role="alert">@_error</MudAlert>
+    }
+
+    <EditForm Model="_request" OnValidSubmit="SubmitAsync">
+        <DataAnnotationsValidator />
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_request.Login"
+                          For="@(() => _request.Login)"
+                          Label="Usuário"
+                          Variant="Variant.Outlined"
+                          AutoFocus="true"
+                          Immediate="true" />
+            <MudTextField @bind-Value="_request.Password"
+                          For="@(() => _request.Password)"
+                          Label="Senha"
+                          InputType="InputType.Password"
+                          Variant="Variant.Outlined"
+                          Immediate="true" />
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Disabled="_submitting">
+                @if (_submitting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" aria-hidden="true" />
+                    <span>Entrando…</span>
+                }
+                else
+                {
+                    <span>Entrar</span>
+                }
+            </MudButton>
+        </MudStack>
+    </EditForm>
+
+    @if (DemoLogin.IsAvailable)
+    {
+        <MudDivider Class="my-5" />
+        <section aria-labelledby="demo-users-title">
+            <MudText Typo="Typo.subtitle1" HtmlTag="h2" id="demo-users-title">Usuários de demonstração</MudText>
+            <MudText Typo="Typo.body2" Class="mb-3">Escolha um perfil para preencher o formulário e depois clique em "Entrar".</MudText>
+            <div class="argos-demo-users">
+                @foreach (var user in DemoLogin.Users)
+                {
+                    <MudPaper Outlined="true" Class="pa-3 argos-demo-user">
+                        <MudText Typo="Typo.body1"><strong>@RoleLabels.For(user.Role)</strong></MudText>
+                        <MudText Typo="Typo.body2" Class="mb-2">@user.Login</MudText>
+                        <MudButton Size="Size.Small"
+                                   Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Login"
+                                   OnClick="() => Fill(user)"
+                                   aria-label="@($"Preencher com o usuário de demonstração {RoleLabels.For(user.Role)}")">
+                            Preencher
+                        </MudButton>
+                    </MudPaper>
+                }
+            </div>
+        </section>
+    }
+</MudPaper>
+
+@code {
+    private readonly LoginRequest _request = new();
+    private string? _error;
+    private bool _submitting;
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery(Name = "reason")]
+    public string? Reason { get; set; }
+
+    private string? Notice => Reason switch
+    {
+        LoginPaths.ReasonExpired => "Sua sessão expirou. Entre novamente para continuar.",
+        LoginPaths.ReasonLogout => "Sessão encerrada.",
+        _ => null,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Quem já está com sessão não precisa entrar de novo.
+        if (await SessionStore.GetAsync() is not null)
+        {
+            Navigation.NavigateTo(LoginPaths.SafeReturnUrl(ReturnUrl), replace: true);
+        }
+    }
+
+    private void Fill(DemoLoginUser user)
+    {
+        _request.Login = user.Login;
+        _request.Password = user.Password;
+        _error = null;
+    }
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+        _submitting = true;
+
+        try
+        {
+            using var response = await Http.PostAsJsonAsync("api/access/login", _request);
+            if (response.IsSuccessStatusCode && await response.Content.ReadFromJsonAsync<LoginResponse>() is { } session)
+            {
+                await Session.SignInAsync(session);
+                Navigation.NavigateTo(LoginPaths.SafeReturnUrl(ReturnUrl), replace: true);
+                return;
+            }
+
+            _error = await ReadProblemDetailAsync(response) ?? "Não foi possível entrar. Tente novamente.";
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Verifique a conexão e tente novamente.";
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private static async Task<string?> ReadProblemDetailAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            return (await response.Content.ReadFromJsonAsync<ProblemResponse>())?.Detail;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+}

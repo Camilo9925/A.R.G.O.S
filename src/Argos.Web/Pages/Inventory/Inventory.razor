@@ -1,5 +1,7 @@
 @page "/inventory"
 
+@attribute [Authorize(Policy = Permissions.InventoryView)]
+
 <PageTitle>Inventário · ARGOS</PageTitle>
 
 <UnderConstruction Title="Inventário"

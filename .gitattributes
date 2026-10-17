@@ -1,0 +1,2 @@
+# O script de subida do nginx roda num contêiner Linux: precisa de LF mesmo em clones no Windows (D-41).
+*.sh text eol=lf

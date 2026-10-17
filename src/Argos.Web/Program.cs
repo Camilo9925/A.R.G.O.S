@@ -1,9 +1,12 @@
 using System.Globalization;
+using Argos.Contracts.Access;
 using Argos.Web;
+using Argos.Web.Auth;
 using Argos.Web.Components.Map;
 using Argos.Web.Services;
 using Argos.Web.Services.Realtime;
 using Argos.Web.Theme;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
@@ -22,7 +25,38 @@ builder.Services.AddSingleton(new DisplayTime(TimeZoneInfo.FindSystemTimeZoneByI
 var apiEndpoint = new ApiEndpoint(new Uri(
     builder.Configuration["Api:BaseUrl"] is { Length: > 0 } apiBaseUrl ? apiBaseUrl : builder.HostEnvironment.BaseAddress));
 builder.Services.AddSingleton(apiEndpoint);
-builder.Services.AddScoped(_ => new HttpClient { BaseAddress = apiEndpoint.BaseAddress });
+
+// Sessão, usuário da interface e políticas por permissão (D-42; plan 14.11). No WebAssembly há um só usuário por
+// aplicação, por isso os serviços de sessão são singletons.
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<SessionStore>();
+builder.Services.AddSingleton<ArgosAuthenticationStateProvider>();
+builder.Services.AddSingleton<AuthenticationStateProvider>(services =>
+    services.GetRequiredService<ArgosAuthenticationStateProvider>());
+builder.Services.AddSingleton<SessionService>();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddAuthorizationCore(options =>
+{
+    // Sem matriz no cliente: cada política só confere a permissão recebida no login.
+    foreach (var permission in Permissions.All)
+    {
+        options.AddPolicy(permission, policy => policy.RequireClaim(AccessClaimTypes.Permission, permission));
+    }
+});
+
+// O token vai em toda requisição à API; um 401 com token encerra a sessão.
+builder.Services.AddScoped(services => new HttpClient(new AuthorizationMessageHandler(
+    services.GetRequiredService<SessionStore>(),
+    services.GetRequiredService<SessionService>())
+{
+    InnerHandler = new HttpClientHandler(),
+})
+{
+    BaseAddress = apiEndpoint.BaseAddress,
+});
+
+// Preenchimento rápido da tela de login, só quando o nginx do ambiente Demo habilita (D-41).
+builder.Services.AddSingleton(DemoLoginOptions.From(builder.Configuration));
 
 builder.Services.AddSingleton(new MapOptions(
     double.Parse(RequiredSetting("Map:Center:Latitude"), CultureInfo.InvariantCulture),

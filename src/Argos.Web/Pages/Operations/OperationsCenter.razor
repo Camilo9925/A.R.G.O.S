@@ -3,6 +3,8 @@
 
 @using Argos.Web.Components.Map
 
+@attribute [Authorize(Policy = Permissions.OperationsView)]
+
 <PageTitle>Central de Operações · ARGOS</PageTitle>
 
 <div class="argos-operations">

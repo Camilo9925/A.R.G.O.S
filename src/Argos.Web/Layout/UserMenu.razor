@@ -1,0 +1,24 @@
+@inject SessionService Session
+
+@* Usuário da sessão, perfil em pt-BR e "Sair" (logout só no cliente, D-37; plan 14.11). *@
+<AuthorizeView>
+    <Authorized>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="argos-user">
+            <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Size="Size.Small" aria-hidden="true" />
+            <div class="argos-user-text">
+                <MudText Typo="Typo.body2">@context.User.FindFirst(AccessClaimTypes.Name)?.Value</MudText>
+                <MudText Typo="Typo.caption">@RoleLabels.For(context.User.FindFirst(AccessClaimTypes.Role)?.Value)</MudText>
+            </div>
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Inherit"
+                       StartIcon="@Icons.Material.Filled.Logout"
+                       OnClick="SignOutAsync">
+                Sair
+            </MudButton>
+        </MudStack>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    private Task SignOutAsync() => Session.EndAsync(SessionEndReason.Logout);
+}

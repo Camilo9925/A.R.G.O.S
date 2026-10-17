@@ -14,6 +14,9 @@ COPY src/ src/
 RUN dotnet publish src/Argos.Web/Argos.Web.csproj -c Release -o /app/publish --no-restore
 
 FROM nginx:alpine AS final
+# Desligado por padrão: só o Compose da demonstração liga o preenchimento rápido do login (D-41).
+ENV ARGOS_ENVIRONMENT=Production
 COPY src/Argos.Web/nginx/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --chmod=755 src/Argos.Web/nginx/40-argos-demo-login.sh /docker-entrypoint.d/40-argos-demo-login.sh
 COPY --from=build /app/publish/wwwroot /usr/share/nginx/html
 EXPOSE 80

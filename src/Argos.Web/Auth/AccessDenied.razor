@@ -1,0 +1,16 @@
+@* Com sessão, mas sem a permissão da página: explica e orienta o próximo passo (RN-26; Art. X.6). *@
+
+<PageTitle>Acesso negado · ARGOS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-8">
+    <MudText Typo="Typo.h4" HtmlTag="h1" GutterBottom="true">Acesso negado</MudText>
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Block">
+        <MudText>O perfil <strong>@RoleLabels.For(Role)</strong> não tem permissão para acessar esta página.</MudText>
+        <MudText Class="mt-2">Use o menu ao lado ou volte para a <MudLink Href="">Central de Operações</MudLink>.</MudText>
+    </MudAlert>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string? Role { get; set; }
+}

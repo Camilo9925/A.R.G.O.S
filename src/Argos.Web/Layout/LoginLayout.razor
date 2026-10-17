@@ -1,0 +1,21 @@
+@inherits LayoutComponentBase
+@inject ThemePreference ThemePreference
+
+@* Layout da tela de login: sem menu nem tempo real, no mesmo tema da Central (Art. X.4; plan 14.11). *@
+<MudThemeProvider Theme="ArgosTheme.Theme" IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<main class="argos-login-layout">
+    @Body
+</main>
+
+@code {
+    private bool _isDarkMode = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isDarkMode = await ThemePreference.LoadIsDarkModeAsync();
+    }
+}

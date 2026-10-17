@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Testes de integração da API contra um PostgreSQL real em contêiner (plan 8.1, 8.2, 9.4). -->
+  <!-- Sem referência ao Argos.Simulator na Fase 0: ela entra com o controller de roteiros (RF-052), via tipo marcador. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Argos.Api\Argos.Api.csproj" />
+    <ProjectReference Include="..\..\Argos.Infrastructure\Argos.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Argos.Contracts\Argos.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

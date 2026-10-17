@@ -11,6 +11,7 @@
     <Project Path="src/Argos.Web/Argos.Web.csproj" />
   </Folder>
   <Folder Name="/src/tests/">
+    <Project Path="src/tests/Argos.IntegrationTests/Argos.IntegrationTests.csproj" />
     <Project Path="src/tests/Argos.UnitTests/Argos.UnitTests.csproj" />
   </Folder>
 </Solution>

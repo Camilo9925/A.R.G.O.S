@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- Infrastructure é referenciada só para a composição da DI (plan 2.3). -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Argos.Application\Argos.Application.csproj" />
+    <ProjectReference Include="..\Argos.Contracts\Argos.Contracts.csproj" />
+    <ProjectReference Include="..\Argos.Infrastructure\Argos.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+
+</Project>

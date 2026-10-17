@@ -8,3 +8,8 @@ assets/
 
 # Segredos
 .env
+
+# Repositório, IDE e resultados de teste
+.git/
+.vs/
+**/TestResults/

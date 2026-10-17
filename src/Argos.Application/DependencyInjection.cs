@@ -1,4 +1,6 @@
+using Argos.Application.Access;
 using Argos.Application.Diagnostics;
+using Argos.Application.Seeding;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Argos.Application;
@@ -11,6 +13,8 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddScoped<TechnicalHeartbeatService>();
+        services.AddScoped<LoginService>();
+        services.AddScoped<DemoUserProvisioningService>();
         return services;
     }
 }

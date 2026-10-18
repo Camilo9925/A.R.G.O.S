@@ -22,6 +22,10 @@ public sealed class RegionService(
     public Task<IReadOnlyList<RegionData>> ListAsync(bool includeInactive, CancellationToken cancellationToken = default) =>
         queries.ListRegionsAsync(includeInactive, cancellationToken);
 
+    /// <summary>Um cadastro pelo id, ativo ou não; inexistente é 404.</summary>
+    public async Task<RegionData> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
+        await queries.GetRegionAsync(id, cancellationToken) ?? throw new NotFoundException("Região não encontrada.");
+
     public async Task<RegionData> CreateAsync(RegionRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -66,9 +70,6 @@ public sealed class RegionService(
 
     private async Task<Region> FindAsync(Guid id, CancellationToken cancellationToken) =>
         await regions.FindByIdAsync(id, cancellationToken) ?? throw new NotFoundException("Região não encontrada.");
-
-    private async Task<RegionData> GetAsync(Guid id, CancellationToken cancellationToken) =>
-        await queries.GetRegionAsync(id, cancellationToken) ?? throw new NotFoundException("Região não encontrada.");
 
     private async Task EnsureUniqueNameAsync(Region region, CancellationToken cancellationToken)
     {

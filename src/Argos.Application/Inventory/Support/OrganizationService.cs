@@ -22,6 +22,10 @@ public sealed class OrganizationService(
     public Task<IReadOnlyList<OrganizationData>> ListAsync(bool includeInactive, CancellationToken cancellationToken = default) =>
         queries.ListOrganizationsAsync(includeInactive, cancellationToken);
 
+    /// <summary>Um cadastro pelo id, ativo ou não; inexistente é 404.</summary>
+    public async Task<OrganizationData> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
+        await queries.GetOrganizationAsync(id, cancellationToken) ?? throw new NotFoundException("Órgão não encontrado.");
+
     public async Task<OrganizationData> CreateAsync(OrganizationRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -68,9 +72,6 @@ public sealed class OrganizationService(
 
     private async Task<Organization> FindAsync(Guid id, CancellationToken cancellationToken) =>
         await organizations.FindByIdAsync(id, cancellationToken) ?? throw new NotFoundException("Órgão não encontrado.");
-
-    private async Task<OrganizationData> GetAsync(Guid id, CancellationToken cancellationToken) =>
-        await queries.GetOrganizationAsync(id, cancellationToken) ?? throw new NotFoundException("Órgão não encontrado.");
 
     private async Task EnsureUniqueAsync(Organization organization, CancellationToken cancellationToken)
     {

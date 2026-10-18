@@ -33,6 +33,10 @@ public sealed class NeighborhoodService(
         Guid? regionId, bool includeInactive, CancellationToken cancellationToken = default) =>
         queries.ListNeighborhoodsAsync(regionId, includeInactive, cancellationToken);
 
+    /// <summary>Um cadastro pelo id, ativo ou não; inexistente é 404.</summary>
+    public async Task<NeighborhoodData> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
+        await queries.GetNeighborhoodAsync(id, cancellationToken) ?? throw new NotFoundException("Bairro não encontrado.");
+
     public async Task<NeighborhoodData> CreateAsync(NeighborhoodRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -104,9 +108,6 @@ public sealed class NeighborhoodService(
 
     private async Task<Neighborhood> FindAsync(Guid id, CancellationToken cancellationToken) =>
         await neighborhoods.FindByIdAsync(id, cancellationToken) ?? throw new NotFoundException("Bairro não encontrado.");
-
-    private async Task<NeighborhoodData> GetAsync(Guid id, CancellationToken cancellationToken) =>
-        await queries.GetNeighborhoodAsync(id, cancellationToken) ?? throw new NotFoundException("Bairro não encontrado.");
 
     private async Task EnsureUniqueNameAsync(Neighborhood neighborhood, CancellationToken cancellationToken)
     {

@@ -29,6 +29,11 @@ public sealed class OperationalBaseService(
         Guid? organizationId, bool includeInactive, CancellationToken cancellationToken = default) =>
         queries.ListOperationalBasesAsync(organizationId, includeInactive, cancellationToken);
 
+    /// <summary>Um cadastro pelo id, ativo ou não; inexistente é 404.</summary>
+    public async Task<OperationalBaseData> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
+        await queries.GetOperationalBaseAsync(id, cancellationToken)
+            ?? throw new NotFoundException("Base operacional não encontrada.");
+
     public async Task<OperationalBaseData> CreateAsync(
         OperationalBaseRequest request, CancellationToken cancellationToken = default)
     {
@@ -97,10 +102,6 @@ public sealed class OperationalBaseService(
 
     private async Task<OperationalBase> FindAsync(Guid id, CancellationToken cancellationToken) =>
         await bases.FindByIdAsync(id, cancellationToken) ?? throw new NotFoundException("Base operacional não encontrada.");
-
-    private async Task<OperationalBaseData> GetAsync(Guid id, CancellationToken cancellationToken) =>
-        await queries.GetOperationalBaseAsync(id, cancellationToken)
-            ?? throw new NotFoundException("Base operacional não encontrada.");
 
     private async Task EnsureUniqueNameAsync(OperationalBase operationalBase, CancellationToken cancellationToken)
     {

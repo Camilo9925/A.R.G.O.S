@@ -40,7 +40,7 @@ public static class MaintenanceNeedCalculator
 
         foreach (var maintenance in maintenances.Where(maintenance => maintenance.IsOpen))
         {
-            var current = Classify(maintenance, today, upcomingWindowDays);
+            var current = Classify(maintenance.Kind, maintenance.DueDate, today, upcomingWindowDays);
             if (current > need)
             {
                 need = current;
@@ -50,18 +50,24 @@ public static class MaintenanceNeedCalculator
         return need;
     }
 
-    private static MaintenanceNeed Classify(Maintenance maintenance, DateOnly today, int upcomingWindowDays)
+    /// <summary>
+    /// Necessidade que uma manutenção aberta representa, para o selo de vencida ou próxima de cada uma (RN-10). A
+    /// Aplicação a usa sobre os dados lidos pela consulta, sem carregar a entidade.
+    /// </summary>
+    public static MaintenanceNeed Classify(MaintenanceKind kind, DateOnly? dueDate, DateOnly today, int upcomingWindowDays)
     {
-        if (maintenance.Kind == MaintenanceKind.Immediate || maintenance.DueDate is not { } dueDate)
+        ArgumentOutOfRangeException.ThrowIfNegative(upcomingWindowDays);
+
+        if (kind == MaintenanceKind.Immediate || dueDate is not { } due)
         {
             return MaintenanceNeed.Immediate;
         }
 
-        if (dueDate < today)
+        if (due < today)
         {
             return MaintenanceNeed.Overdue;
         }
 
-        return dueDate <= today.AddDays(upcomingWindowDays) ? MaintenanceNeed.Upcoming : MaintenanceNeed.Scheduled;
+        return due <= today.AddDays(upcomingWindowDays) ? MaintenanceNeed.Upcoming : MaintenanceNeed.Scheduled;
     }
 }

@@ -276,6 +276,20 @@ public sealed class MaintenanceTests
         Assert.Equal(expected, equipment.CalculateMaintenanceNeed(Today, DefaultWindow));
     }
 
+    [Theory]
+    [InlineData(MaintenanceKind.Immediate, null, MaintenanceNeed.Immediate)]
+    [InlineData(MaintenanceKind.Scheduled, -1, MaintenanceNeed.Overdue)]
+    [InlineData(MaintenanceKind.Periodic, 0, MaintenanceNeed.Upcoming)]
+    [InlineData(MaintenanceKind.Scheduled, 7, MaintenanceNeed.Upcoming)]
+    [InlineData(MaintenanceKind.Periodic, 8, MaintenanceNeed.Scheduled)]
+    public void Classify_SingleOpenMaintenance_SameRuleAsCalculate_RN10(
+        MaintenanceKind kind, int? daysFromToday, MaintenanceNeed expected)
+    {
+        var dueDate = daysFromToday is { } days ? Today.AddDays(days) : (DateOnly?)null;
+
+        Assert.Equal(expected, MaintenanceNeedCalculator.Classify(kind, dueDate, Today, DefaultWindow));
+    }
+
     [Fact]
     public void Need_WindowFromParameter_ChangesUpcoming_RN10_RN34()
     {

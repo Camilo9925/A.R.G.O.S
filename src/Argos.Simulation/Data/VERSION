@@ -21,8 +21,8 @@ Conversão:
     temáticas sem nomes de pessoas (árvores, flores, aves, rios e serras fictícios, astros e constelações, pedras e
     mitologia grega), intercaladas um tema por vez; nomes que coincidiam com algum nome real da caixa (logradouros,
     lugares e estabelecimentos) foram descartados antes da atribuição;
-  - tipo do logradouro: Avenida se algum trecho é major; Travessa se o comprimento total é menor que 150 m; Rua nos
-    demais casos;
+  - tipo do logradouro: Avenida se algum trecho é major ou secondary; nos demais, Travessa se o comprimento total é
+    menor que 150 m e Rua acima disso; a busca dos nomes reais foi repetida com os tipos finais;
   - bairro de cada trecho: o do ponto central de bairro mais próximo do meio do trecho. Um logradouro que atravessa
     bairros vira um registro por bairro;
   - CEP: um por registro (logradouro dentro de um bairro), com o prefixo 16985, exclusivo de Prometeia e diferente do

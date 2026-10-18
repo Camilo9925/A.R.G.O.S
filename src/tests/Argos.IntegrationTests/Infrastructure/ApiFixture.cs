@@ -14,7 +14,8 @@ namespace Argos.IntegrationTests.Infrastructure;
 /// <summary>
 /// Sobe um PostgreSQL 17 descartável, aplica as migrations reais pelo mesmo ponto de entrada do Migrator
 /// e hospeda a API em memória no ambiente <c>Testing</c> (plan 8.2). Compartilhada por toda a coleção.
-/// Inclui a sonda de políticas (<see cref="PolicyProbeController"/>), que só existe neste projeto (D-44).
+/// Inclui as sondas de políticas (<see cref="PolicyProbeController"/>, D-44) e de erros (<see cref="ErrorProbeController"/>),
+/// que só existem neste projeto.
 /// </summary>
 public sealed class ApiFixture : IAsyncLifetime
 {

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Argos.Api.Configuration;
 using Argos.Contracts.Access;
 using Microsoft.OpenApi;
@@ -19,12 +20,18 @@ internal static class OpenApiExtensions
     {
         if (environment.IsEnvironment(ArgosEnvironments.Demo))
         {
-            services.AddOpenApi(options => options.AddDocumentTransformer((document, _, _) =>
-            {
-                document.Info.Title = Title;
-                AddSecuritySchemes(document);
-                return Task.CompletedTask;
-            }));
+            services.AddOpenApi(options => options
+                .AddDocumentTransformer((document, _, _) =>
+                {
+                    document.Info.Title = Title;
+                    AddSecuritySchemes(document);
+                    return Task.CompletedTask;
+                })
+                .AddOperationTransformer((operation, _, _) =>
+                {
+                    CamelCaseQueryParameters(operation);
+                    return Task.CompletedTask;
+                }));
         }
 
         return services;
@@ -39,6 +46,22 @@ internal static class OpenApiExtensions
         }
 
         return app;
+    }
+
+    /// <summary>
+    /// Documenta os parâmetros de query em camelCase, como o JSON e o plano (15.8): os de um objeto de consulta, como
+    /// <c>EquipmentSearchQuery</c>, saem com o nome da propriedade. O binding não diferencia maiúsculas, então o nome
+    /// documentado é aceito.
+    /// </summary>
+    private static void CamelCaseQueryParameters(OpenApiOperation operation)
+    {
+        foreach (var parameter in operation.Parameters ?? [])
+        {
+            if (parameter is OpenApiParameter { In: ParameterLocation.Query, Name: { } name } query)
+            {
+                query.Name = JsonNamingPolicy.CamelCase.ConvertName(name);
+            }
+        }
     }
 
     private static void AddSecuritySchemes(OpenApiDocument document)

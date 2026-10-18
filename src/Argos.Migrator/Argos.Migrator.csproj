@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Execução única: aplica as migrations, registra o seed e reconcilia os usuários de demonstração (plan 5.3, 7.4, 14.10).
-       Infrastructure só para DI e migração. -->
+  <!-- Execução única: aplica as migrations, registra o seed, carrega o Inventário e reconcilia os usuários de demonstração
+       (plan 5.3, 7.4, 14.10, 15.11.4). Infrastructure só para DI e migração. -->
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>

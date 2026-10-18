@@ -1,9 +1,11 @@
 using Argos.Application.Common.Abstractions;
 using Argos.Application.Common.Exceptions;
 using Argos.Application.Seeding;
+using Argos.Application.Seeding.Inventory;
 using Argos.Infrastructure.DependencyInjection;
 using Argos.Infrastructure.Persistence;
 using Argos.Migrator.Configuration;
+using Argos.Migrator.Seeding;
 using Argos.Simulation.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,8 +37,11 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ICurrentActor, SystemCurrentActor>();
 builder.Services.AddInfrastructure(connectionString);
 
-// Só o caso de uso de que o Migrator precisa; o resto da Aplicação depende de portas que só a API implementa.
+// Só os casos de uso de que o Migrator precisa; o resto da Aplicação depende de portas que só a API implementa.
 builder.Services.AddScoped<DemoUserProvisioningService>();
+builder.Services.AddScoped<BusinessParameterProvisioningService>();
+builder.Services.AddScoped<InventoryReferenceSeeder>();
+builder.Services.AddScoped<EquipmentCatalogSeeder>();
 
 using var host = builder.Build();
 
@@ -60,6 +65,13 @@ try
     else
     {
         logger.LogInformation("Seed {Version} com a semente {Seed} já estava aplicado; nada a fazer.", SeedVersions.Foundation, simulation.Seed);
+    }
+
+    // Parâmetros de negócio, referência e catálogo do Inventário (plan 15.11.4).
+    if (!await InventoryLoad.RunAsync(
+        host.Services, builder.Configuration, simulation, host.Services.GetRequiredService<TimeProvider>(), logger))
+    {
+        return 1;
     }
 
     // Os usuários de demonstração são reconciliados a cada execução, independentemente do seed (D-40).

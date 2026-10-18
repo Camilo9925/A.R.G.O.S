@@ -26,13 +26,8 @@ namespace Argos.IntegrationTests.Inventory;
 /// </summary>
 public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationTestBase(fixture)
 {
-    private const string Saint = "São Jorge";
-    private const string Downtown = "Centro";
-
-    private static readonly SeedPoint[] Square =
-    [
-        new(-22.20, -49.70), new(-22.20, -49.60), new(-22.30, -49.60), new(-22.30, -49.70), new(-22.20, -49.70),
-    ];
+    private const string Saint = InventorySeedData.Saint;
+    private const string Downtown = InventorySeedData.Downtown;
 
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
@@ -305,28 +300,11 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
             .FindAppliedSeedAsync(InventorySeed.ReferenceVersion, Cancellation));
     }
 
-    /// <summary>
-    /// Município quadrado, uma zona, dois bairros (um com acento, para a busca), um CEP, um órgão e uma base no Centro,
-    /// mais os dez tipos do catálogo, pela carga <c>inventory-reference-v1</c>.
-    /// </summary>
+    /// <summary>Referência pequena de <see cref="InventorySeedData"/>, pela carga <c>inventory-reference-v1</c>.</summary>
     private async Task<Scenario> SeedReferenceAsync()
     {
-        var reference = new InventoryReferenceSeed(
-            new MunicipalitySeed("Prometeia", "SP", "America/Sao_Paulo", Square, new SeedPoint(-22.25, -49.65)),
-            [new RegionSeed("Zona Única", Square)],
-            [
-                new NeighborhoodSeed(Saint, "Zona Única", new SeedPoint(-22.24, -49.64)),
-                new NeighborhoodSeed(Downtown, "Zona Única", new SeedPoint(-22.26, -49.66)),
-            ],
-            [new ZipCodeSeed("16985001", "Rua das Flores", Saint, new SeedPoint(-22.241, -49.641))],
-            [new OrganizationSeed("DMT", "Departamento Municipal de Trânsito")],
-            [
-                new OperationalBaseSeed(
-                    "Base Central", "DMT", new LocationSeed("16985002", "Avenida Brasil", Downtown, "número 100", -22.26, -49.66)),
-            ]);
-
         await UseAsync<InventoryReferenceSeeder, SeedResult>(seeder => seeder.SeedAsync(
-            reference, seed: 42, registeredAt: DateTimeOffset.UtcNow.AddDays(-1), Cancellation));
+            InventorySeedData.Reference(), seed: 42, registeredAt: DateTimeOffset.UtcNow.AddDays(-1), Cancellation));
 
         await using var scope = Fixture.Factory.Services.CreateAsyncScope();
         var queries = scope.ServiceProvider.GetRequiredService<IInventoryQueries>();

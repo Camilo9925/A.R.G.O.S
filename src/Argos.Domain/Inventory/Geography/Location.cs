@@ -15,6 +15,11 @@ public sealed record Location
     public const int ReferenceMinLength = 1;
     public const int ReferenceMaxLength = 120;
 
+    // Usado pelo EF Core ao materializar: o tipo complexo não liga o GeoPoint a um parâmetro do construtor.
+    private Location()
+    {
+    }
+
     private Location(
         ZipCode zipCode, string street, Guid neighborhoodId, string city, string state, string reference, GeoPoint point)
     {
@@ -27,22 +32,22 @@ public sealed record Location
         Point = point;
     }
 
-    public ZipCode ZipCode { get; }
+    public ZipCode ZipCode { get; } = null!;
 
-    public string Street { get; }
+    public string Street { get; } = string.Empty;
 
     public Guid NeighborhoodId { get; }
 
     /// <summary>Sempre a do município, nunca do usuário (D-50; RF-004).</summary>
-    public string City { get; }
+    public string City { get; } = string.Empty;
 
     /// <summary>Sempre a UF do município (D-50; RF-004).</summary>
-    public string State { get; }
+    public string State { get; } = string.Empty;
 
     /// <summary>Texto livre obrigatório, como "número 181", "oposto ao número 181", "KM 203" ou "S/N" (RN-03).</summary>
-    public string Reference { get; }
+    public string Reference { get; } = string.Empty;
 
-    public GeoPoint Point { get; }
+    public GeoPoint Point { get; } = null!;
 
     /// <summary>
     /// Valida e monta a localização, com todos os erros de uma vez: CEP com 8 dígitos (RN-02), rua, bairro ativo,

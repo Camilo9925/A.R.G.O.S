@@ -1,0 +1,35 @@
+prometeia.json: geografia da cidade fictícia Prometeia/SP (D-07, D-51; plan 15.11.1). Nomes, bairros e CEPs inventados.
+Fonte da malha: OpenStreetMap, via Overpass API (https://overpass-api.de/api/interpreter), extraída manualmente uma única vez,
+na mesma caixa do streets.json da Web, sem ferramenta instalada e sem script versionado (como o streets.json, D-08).
+Data dos dados: 2026-10-18 (timestamp_osm_base 2026-10-18T11:36:05Z).
+Licença: Open Database License (ODbL) 1.0, https://opendatacommons.org/licenses/odbl/1-0/.
+         Os logradouros são uma base de dados derivada e seguem sob a ODbL. Atribuição: © OpenStreetMap contributors
+         (https://www.openstreetmap.org/copyright).
+Consulta: [out:json];way["highway"](-22.255,-49.705,-22.175,-49.605);out tags geom;
+Conversão:
+  - classes das vias como no streets.json (major, secondary, local; minor e vias não carroçáveis ficam de fora),
+    coordenadas com 5 casas decimais e pontos repetidos removidos;
+  - contorno do município (22 vértices) e polígonos das 5 zonas desenhados à mão sobre a área urbana: o Centro é um
+    polígono próprio e as zonas Norte, Leste, Sul e Oeste vão do contorno do Centro ao do município, divididas por
+    quatro segmentos que ligam os cantos do Centro a vértices do contorno; sem sobreposição e cobrindo o município;
+  - 30 bairros com nomes inventados e ponto central escolhido sobre a malha (4 no Centro, 7 nas zonas Norte, Sul e
+    Oeste, 5 na Leste); a região de cada bairro é a zona que contém o ponto central;
+  - logradouros: trechos com a etiqueta name, das classes major, secondary e local, cujo ponto no meio do comprimento
+    fica dentro do município; a etiqueta name foi usada só para agrupar os trechos de um mesmo logradouro e descartada
+    em seguida, e nenhum nome real fica no arquivo;
+  - os logradouros foram ordenados pelo menor id de via do OSM de cada um e receberam, nessa ordem, nomes de listas
+    temáticas sem nomes de pessoas (árvores, flores, aves, rios e serras fictícios, astros e constelações, pedras e
+    mitologia grega), intercaladas um tema por vez; nomes que coincidiam com algum nome real da caixa (logradouros,
+    lugares e estabelecimentos) foram descartados antes da atribuição;
+  - tipo do logradouro: Avenida se algum trecho é major; Travessa se o comprimento total é menor que 150 m; Rua nos
+    demais casos;
+  - bairro de cada trecho: o do ponto central de bairro mais próximo do meio do trecho. Um logradouro que atravessa
+    bairros vira um registro por bairro;
+  - CEP: um por registro (logradouro dentro de um bairro), com o prefixo 16985, exclusivo de Prometeia e diferente do
+    da cidade-base, e sufixo sequencial de 001 em diante, na ordem dos logradouros e dos bairros;
+  - ponto de referência de cada CEP: o meio do trecho mais longo do registro.
+Formato: {"municipality":{"name","state","timeZoneId","center":[lat,lon],"boundary":[[lat,lon],...]},
+          "zipCodePrefix", "regions":[{"name","boundary"}], "neighborhoods":[{"name","region","center"}],
+          "streets":[{"zipCode","street","class","neighborhood","referencePoint","geometry":[[lat,lon,lat,lon,...],...]}]}
+         Os contornos são anéis abertos (o último vértice liga ao primeiro), no sentido horário.
+Para atualizar: repetir a consulta e a conversão acima e substituir prometeia.json e este arquivo (plan 15.11.1).

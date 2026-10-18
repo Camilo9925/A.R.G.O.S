@@ -2,4 +2,9 @@
 
   <!-- Motor de simulação determinístico: sem dependências e sem I/O (Art. IX.3, plan 2.2). -->
 
+  <ItemGroup>
+    <!-- Geografia de Prometeia, lida do próprio assembly (D-51; plan 15.11.1). -->
+    <EmbeddedResource Include="Data\prometeia.json" LogicalName="Argos.Simulation.Data.prometeia.json" />
+  </ItemGroup>
+
 </Project>

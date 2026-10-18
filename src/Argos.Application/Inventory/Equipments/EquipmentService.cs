@@ -31,6 +31,12 @@ public sealed class EquipmentService(
     ICurrentActor actor,
     TimeProvider timeProvider)
 {
+    /// <summary>Mensagem da RN-01, a mesma quando a duplicidade é pega pelo índice único do banco.</summary>
+    public const string DuplicateBrandAndSerialMessage = "Já existe um equipamento com essa marca e esse número de série.";
+
+    /// <summary>Extensão do <c>ProblemDetails</c> com o id do equipamento existente (US-01; plan 15.7).</summary>
+    public const string ExistingEquipmentIdExtension = "existingEquipmentId";
+
     private const string InitialMaintenanceField = "initialMaintenance";
 
     /// <summary>
@@ -179,8 +185,8 @@ public sealed class EquipmentService(
         if (existingId is { } id && id != equipment.Id)
         {
             throw new ConflictException(
-                "Já existe um equipamento com essa marca e esse número de série.",
-                new Dictionary<string, object?> { ["existingEquipmentId"] = id });
+                DuplicateBrandAndSerialMessage,
+                new Dictionary<string, object?> { [ExistingEquipmentIdExtension] = id });
         }
     }
 }

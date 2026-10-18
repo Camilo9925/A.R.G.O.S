@@ -11,8 +11,15 @@ public sealed class ConflictException : Exception
     {
     }
 
-    public ConflictException(string message, IReadOnlyDictionary<string, object?> extensions)
-        : base(message)
+    /// <param name="innerException">Erro do banco que revelou o conflito, quando a Infraestrutura o traduz (D-60).</param>
+    public ConflictException(string message, Exception innerException)
+        : this(message, new Dictionary<string, object?>(), innerException)
+    {
+    }
+
+    public ConflictException(
+        string message, IReadOnlyDictionary<string, object?> extensions, Exception? innerException = null)
+        : base(message, innerException)
     {
         Extensions = extensions;
     }

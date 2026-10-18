@@ -10,6 +10,7 @@ public static class Permissions
     public const string OperationsView = "operations.view";
     public const string AlertsHandle = "alerts.handle";
     public const string ResourceStatusChange = "resources.status.change";
+    public const string ResourceReactivate = "resources.reactivate";
     public const string AgentPositionsView = "agents.positions.view";
     public const string InventoryView = "inventory.view";
     public const string InventoryManage = "inventory.manage";
@@ -23,6 +24,7 @@ public static class Permissions
         OperationsView,
         AlertsHandle,
         ResourceStatusChange,
+        ResourceReactivate,
         AgentPositionsView,
         InventoryView,
         InventoryManage,

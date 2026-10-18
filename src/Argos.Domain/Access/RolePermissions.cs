@@ -1,7 +1,8 @@
 namespace Argos.Domain.Access;
 
 /// <summary>
-/// Matriz perfil × permissão da RN-26 (spec v1.1.3), incluindo o recorte da RN-27 sobre a posição de agentes.
+/// Matriz perfil × permissão da RN-26 (spec v1.1.3), incluindo a reativação só do Administrador (RN-05, D-47) e o
+/// recorte da RN-27 sobre a posição de agentes.
 /// É a única fonte dessa regra: API e Web a recebem já traduzida pela Aplicação (D-32).
 /// </summary>
 public static class RolePermissions
@@ -9,7 +10,8 @@ public static class RolePermissions
     private static readonly IReadOnlyDictionary<UserRole, IReadOnlySet<Permission>> Matrix =
         new Dictionary<UserRole, IReadOnlySet<Permission>>
         {
-            // Administrador: todos os cadastros, tipos e parâmetros, além de tudo que os demais perfis fazem.
+            // Administrador: todos os cadastros, tipos e parâmetros, a reativação de equipamento desativado (D-47),
+            // além de tudo que os demais perfis fazem.
             [UserRole.Administrator] = new HashSet<Permission>(Enum.GetValues<Permission>()),
 
             // Operador: Central, alertas, situação de equipamentos e agentes, histórico e posição de agentes (RN-27).

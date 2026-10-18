@@ -15,6 +15,9 @@ public enum Permission
     /// <summary>Alterar a situação de equipamentos e agentes (US-04).</summary>
     ResourceStatusChange,
 
+    /// <summary>Reativar um equipamento desativado, de Desativado para Operacional (RN-05; D-47).</summary>
+    ResourceReactivate,
+
     /// <summary>Receber a posição individual de agentes (RN-27).</summary>
     AgentPositionsView,
 

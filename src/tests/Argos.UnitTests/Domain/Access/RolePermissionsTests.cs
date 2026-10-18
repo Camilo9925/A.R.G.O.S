@@ -3,7 +3,8 @@ using Argos.Domain.Access;
 namespace Argos.UnitTests.Domain.Access;
 
 /// <summary>
-/// Matriz perfil × permissão (RN-26, spec v1.1.3) e recorte da posição de agentes (RN-27); plan 14.3.
+/// Matriz perfil × permissão (RN-26, spec v1.1.3), reativação só do Administrador (RN-05, D-47) e recorte da
+/// posição de agentes (RN-27); plan 14.3.
 /// </summary>
 public sealed class RolePermissionsTests
 {
@@ -13,6 +14,7 @@ public sealed class RolePermissionsTests
         (UserRole.Administrator, Permission.OperationsView, true),
         (UserRole.Administrator, Permission.AlertsHandle, true),
         (UserRole.Administrator, Permission.ResourceStatusChange, true),
+        (UserRole.Administrator, Permission.ResourceReactivate, true),
         (UserRole.Administrator, Permission.AgentPositionsView, true),
         (UserRole.Administrator, Permission.InventoryView, true),
         (UserRole.Administrator, Permission.InventoryManage, true),
@@ -24,6 +26,7 @@ public sealed class RolePermissionsTests
         (UserRole.Operator, Permission.OperationsView, true),
         (UserRole.Operator, Permission.AlertsHandle, true),
         (UserRole.Operator, Permission.ResourceStatusChange, true),
+        (UserRole.Operator, Permission.ResourceReactivate, false),
         (UserRole.Operator, Permission.AgentPositionsView, true),
         (UserRole.Operator, Permission.InventoryView, false),
         (UserRole.Operator, Permission.InventoryManage, false),
@@ -35,6 +38,7 @@ public sealed class RolePermissionsTests
         (UserRole.Manager, Permission.OperationsView, true),
         (UserRole.Manager, Permission.AlertsHandle, false),
         (UserRole.Manager, Permission.ResourceStatusChange, false),
+        (UserRole.Manager, Permission.ResourceReactivate, false),
         (UserRole.Manager, Permission.AgentPositionsView, false),
         (UserRole.Manager, Permission.InventoryView, true),
         (UserRole.Manager, Permission.InventoryManage, false),
@@ -93,6 +97,12 @@ public sealed class RolePermissionsTests
         Assert.Equal(
             [UserRole.Administrator, UserRole.Operator],
             RolePermissions.RolesWith(Permission.AgentPositionsView));
+    }
+
+    [Fact]
+    public void Reactivation_OnlyAdministrator_RN05_D47()
+    {
+        Assert.Equal([UserRole.Administrator], RolePermissions.RolesWith(Permission.ResourceReactivate));
     }
 
     [Fact]

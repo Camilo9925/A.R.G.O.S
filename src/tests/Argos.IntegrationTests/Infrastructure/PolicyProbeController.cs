@@ -30,6 +30,10 @@ public sealed class PolicyProbeController : ControllerBase
     [Authorize(Policy = Permissions.ResourceStatusChange)]
     public IActionResult ResourceStatusChange() => NoContent();
 
+    [HttpGet(Permissions.ResourceReactivate)]
+    [Authorize(Policy = Permissions.ResourceReactivate)]
+    public IActionResult ResourceReactivate() => NoContent();
+
     [HttpGet(Permissions.AgentPositionsView)]
     [Authorize(Policy = Permissions.AgentPositionsView)]
     public IActionResult AgentPositionsView() => NoContent();

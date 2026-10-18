@@ -34,6 +34,7 @@ public static class AccessPolicyCatalog
         Permission.OperationsView => Permissions.OperationsView,
         Permission.AlertsHandle => Permissions.AlertsHandle,
         Permission.ResourceStatusChange => Permissions.ResourceStatusChange,
+        Permission.ResourceReactivate => Permissions.ResourceReactivate,
         Permission.AgentPositionsView => Permissions.AgentPositionsView,
         Permission.InventoryView => Permissions.InventoryView,
         Permission.InventoryManage => Permissions.InventoryManage,

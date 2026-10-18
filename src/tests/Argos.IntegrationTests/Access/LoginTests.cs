@@ -51,6 +51,9 @@ public sealed class LoginTests(ApiFixture fixture) : IntegrationTestBase(fixture
         // RN-26: a Web recebe exatamente as permissões do perfil.
         Assert.Equal(Rn26Matrix.PermissionsFor(role).Order(), login.Permissions.Order());
 
+        // D-47: só o Administrador recebe a reativação, e a Web só oferece a opção a quem a tem.
+        Assert.Equal(role == UserRoles.Administrator, login.Permissions.Contains(Permissions.ResourceReactivate));
+
         // D-09: 8 h de validade, em UTC.
         Assert.Equal(TimeSpan.Zero, login.ExpiresAt.Offset);
         Assert.InRange(login.ExpiresAt, before.AddHours(8).AddSeconds(-2), DateTimeOffset.UtcNow.AddHours(8));

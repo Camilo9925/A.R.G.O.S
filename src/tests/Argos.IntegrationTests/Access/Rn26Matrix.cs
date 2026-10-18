@@ -13,6 +13,7 @@ internal static class Rn26Matrix
         [Permissions.OperationsView] = [UserRoles.Administrator, UserRoles.Operator, UserRoles.Manager],
         [Permissions.AlertsHandle] = [UserRoles.Administrator, UserRoles.Operator],
         [Permissions.ResourceStatusChange] = [UserRoles.Administrator, UserRoles.Operator],
+        [Permissions.ResourceReactivate] = [UserRoles.Administrator],
         [Permissions.AgentPositionsView] = [UserRoles.Administrator, UserRoles.Operator],
         [Permissions.InventoryView] = [UserRoles.Administrator, UserRoles.Manager],
         [Permissions.InventoryManage] = [UserRoles.Administrator],

@@ -1,0 +1,239 @@
+@page "/inventory/settings"
+
+@attribute [Authorize(Policy = Permissions.InventoryManage)]
+@inject InventoryReferenceClient Reference
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+@*
+    Cadastros de apoio (RF-019, RF-020; D-57, D-67; plan 15.15): órgãos, regiões, bairros e bases, cada aba com lista,
+    filtro "inativos", criação, edição e inativação. Nada é excluído (RN-23); a inativação com dependentes ativos é
+    recusada pela API com o motivo.
+*@
+<PageTitle>Cadastros de apoio · ARGOS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudText Typo="Typo.h4" HtmlTag="h1" Class="mb-3">Cadastros de apoio</MudText>
+
+    <SaveErrorAlert Message="@_error" />
+
+    <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pa-4" @bind-ActivePanelIndex="_tab">
+        <MudTabPanel Text="Órgãos" Icon="@Icons.Material.Filled.AccountBalance">
+            @Toolbar("Novo órgão", () => EditOrganizationAsync(null))
+            <MudTable Items="_organizations" Dense="true" Hover="true" Outlined="true" Loading="_loading" T="OrganizationData"
+                      Breakpoint="Breakpoint.Sm">
+                <HeaderContent><MudTh>Sigla</MudTh><MudTh>Nome</MudTh><MudTh>Situação</MudTh><MudTh><span class="mud-sr-only">Ações</span></MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Sigla">@context.Acronym</MudTd>
+                    <MudTd DataLabel="Nome">@context.Name</MudTd>
+                    <MudTd DataLabel="Situação">@ActiveChip(context.IsActive)</MudTd>
+                    <MudTd>@RowActions(context.IsActive, context.Name, () => EditOrganizationAsync(context), () => InactivateAsync("o órgão", context.Name, () => Reference.InactivateOrganizationAsync(context.Id)))</MudTd>
+                </RowTemplate>
+                <NoRecordsContent><MudText Typo="Typo.body2">Nenhum órgão.</MudText></NoRecordsContent>
+            </MudTable>
+        </MudTabPanel>
+        <MudTabPanel Text="Regiões" Icon="@Icons.Material.Filled.Map">
+            @Toolbar("Nova região", () => EditRegionAsync(null))
+            <MudTable Items="_regions" Dense="true" Hover="true" Outlined="true" Loading="_loading" T="RegionData" Breakpoint="Breakpoint.Sm">
+                <HeaderContent><MudTh>Nome</MudTh><MudTh>Contorno no mapa</MudTh><MudTh>Situação</MudTh><MudTh><span class="mud-sr-only">Ações</span></MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Nome">@context.Name</MudTd>
+                    <MudTd DataLabel="Contorno no mapa">@(context.Boundary is null ? "Não" : "Sim")</MudTd>
+                    <MudTd DataLabel="Situação">@ActiveChip(context.IsActive)</MudTd>
+                    <MudTd>@RowActions(context.IsActive, context.Name, () => EditRegionAsync(context), () => InactivateAsync("a região", context.Name, () => Reference.InactivateRegionAsync(context.Id)))</MudTd>
+                </RowTemplate>
+                <NoRecordsContent><MudText Typo="Typo.body2">Nenhuma região.</MudText></NoRecordsContent>
+            </MudTable>
+        </MudTabPanel>
+        <MudTabPanel Text="Bairros" Icon="@Icons.Material.Filled.Home">
+            @Toolbar("Novo bairro", () => EditNeighborhoodAsync(null))
+            <MudTable Items="_neighborhoods" Dense="true" Hover="true" Outlined="true" Loading="_loading" T="NeighborhoodData"
+                      Breakpoint="Breakpoint.Sm">
+                <HeaderContent><MudTh>Nome</MudTh><MudTh>Região</MudTh><MudTh>Situação</MudTh><MudTh><span class="mud-sr-only">Ações</span></MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Nome">@context.Name</MudTd>
+                    <MudTd DataLabel="Região">@context.RegionName</MudTd>
+                    <MudTd DataLabel="Situação">@ActiveChip(context.IsActive)</MudTd>
+                    <MudTd>@RowActions(context.IsActive, context.Name, () => EditNeighborhoodAsync(context), () => InactivateAsync("o bairro", context.Name, () => Reference.InactivateNeighborhoodAsync(context.Id)))</MudTd>
+                </RowTemplate>
+                <NoRecordsContent><MudText Typo="Typo.body2">Nenhum bairro.</MudText></NoRecordsContent>
+            </MudTable>
+        </MudTabPanel>
+        <MudTabPanel Text="Bases" Icon="@Icons.Material.Filled.Warehouse">
+            @Toolbar("Nova base", () => EditBaseAsync(null))
+            <MudTable Items="_bases" Dense="true" Hover="true" Outlined="true" Loading="_loading" T="OperationalBaseData" Breakpoint="Breakpoint.Sm">
+                <HeaderContent><MudTh>Nome</MudTh><MudTh>Órgão</MudTh><MudTh>Endereço</MudTh><MudTh>Situação</MudTh><MudTh><span class="mud-sr-only">Ações</span></MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Nome">@context.Name</MudTd>
+                    <MudTd DataLabel="Órgão">@context.OrganizationAcronym</MudTd>
+                    <MudTd DataLabel="Endereço">@context.Location.Street, @context.Location.Reference · @context.Location.NeighborhoodName</MudTd>
+                    <MudTd DataLabel="Situação">@ActiveChip(context.IsActive)</MudTd>
+                    <MudTd>@RowActions(context.IsActive, context.Name, () => EditBaseAsync(context), () => InactivateAsync("a base", context.Name, () => Reference.InactivateOperationalBaseAsync(context.Id)))</MudTd>
+                </RowTemplate>
+                <NoRecordsContent><MudText Typo="Typo.body2">Nenhuma base.</MudText></NoRecordsContent>
+            </MudTable>
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    private static readonly DialogOptions SmallDialog = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
+    private static readonly DialogOptions LargeDialog = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+    private IReadOnlyList<OrganizationData> _organizations = [];
+    private IReadOnlyList<RegionData> _regions = [];
+    private IReadOnlyList<NeighborhoodData> _neighborhoods = [];
+    private IReadOnlyList<OperationalBaseData> _bases = [];
+    private MunicipalityData? _municipality;
+    private bool _includeInactive;
+    private bool _loading = true;
+    private string? _error;
+    private int _tab;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var organizations = Reference.ListOrganizationsAsync(_includeInactive);
+            var regions = Reference.ListRegionsAsync(_includeInactive);
+            var neighborhoods = Reference.ListNeighborhoodsAsync(_includeInactive);
+            var bases = Reference.ListOperationalBasesAsync(_includeInactive);
+            _municipality ??= await Reference.GetMunicipalityAsync();
+            (_organizations, _regions, _neighborhoods, _bases) = (await organizations, await regions, await neighborhoods, await bases);
+        }
+        catch (ApiProblemException problem)
+        {
+            _error = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Recarregue a página para tentar de novo.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task IncludeInactiveChangedAsync(bool value)
+    {
+        _includeInactive = value;
+        await LoadAsync();
+    }
+
+    private RenderFragment Toolbar(string createLabel, Func<Task> create) => __builder =>
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3" Wrap="Wrap.Wrap">
+            <MudSwitch T="bool" Value="_includeInactive" ValueChanged="IncludeInactiveChangedAsync" Color="Color.Primary"
+                       Label="Mostrar inativos" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="create">
+                @createLabel
+            </MudButton>
+        </MudStack>
+    };
+
+    private static readonly StatusToken Active = new("Ativo", "#2EBD59", Icons.Material.Filled.CheckCircle);
+    private static readonly StatusToken Inactive = new("Inativo", "#8A94A6", Icons.Material.Outlined.DoNotDisturbOn, IsOutlined: true);
+
+    private RenderFragment ActiveChip(bool isActive) => __builder =>
+    {
+        <TokenBadge Token="@(isActive ? Active : Inactive)" />
+    };
+
+    private RenderFragment RowActions(bool isActive, string name, Func<Task> edit, Func<Task> inactivate) => __builder =>
+    {
+        @if (isActive)
+        {
+            <MudStack Row="true" Spacing="1" Justify="Justify.FlexEnd">
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"
+                           OnClick="edit" aria-label="@($"Editar {name}")">
+                    Editar
+                </MudButton>
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Outlined.DoNotDisturbOn" OnClick="inactivate" aria-label="@($"Inativar {name}")">
+                    Inativar
+                </MudButton>
+            </MudStack>
+        }
+    };
+
+    private Task EditOrganizationAsync(OrganizationData? existing) =>
+        EditAsync<OrganizationDialog>(
+            existing is null ? "Órgão criado." : "Órgão atualizado.",
+            new DialogParameters<OrganizationDialog> { { dialog => dialog.Existing, existing } },
+            SmallDialog);
+
+    private Task EditRegionAsync(RegionData? existing) =>
+        EditAsync<RegionDialog>(
+            existing is null ? "Região criada." : "Região atualizada.",
+            new DialogParameters<RegionDialog> { { dialog => dialog.Existing, existing } },
+            SmallDialog);
+
+    private Task EditNeighborhoodAsync(NeighborhoodData? existing) =>
+        EditAsync<NeighborhoodDialog>(
+            existing is null ? "Bairro criado." : "Bairro atualizado.",
+            new DialogParameters<NeighborhoodDialog>
+            {
+                { dialog => dialog.Existing, existing },
+                { dialog => dialog.Regions, _regions.Where(region => region.IsActive).ToArray() },
+                { dialog => dialog.Municipality, _municipality },
+            },
+            LargeDialog);
+
+    private Task EditBaseAsync(OperationalBaseData? existing) =>
+        EditAsync<OperationalBaseDialog>(
+            existing is null ? "Base criada." : "Base atualizada.",
+            new DialogParameters<OperationalBaseDialog>
+            {
+                { dialog => dialog.Existing, existing },
+                { dialog => dialog.Organizations, _organizations.Where(organization => organization.IsActive).ToArray() },
+                { dialog => dialog.Neighborhoods, _neighborhoods.Where(neighborhood => neighborhood.IsActive).ToArray() },
+                { dialog => dialog.Municipality, _municipality },
+            },
+            LargeDialog);
+
+    private async Task EditAsync<TDialog>(string success, DialogParameters parameters, DialogOptions options)
+        where TDialog : IComponent
+    {
+        var dialog = await Dialogs.ShowAsync<TDialog>(null, parameters, options);
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add(success, Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    /// <summary>Confirma e inativa; a recusa da API (dependentes ativos) aparece com o motivo.</summary>
+    private async Task InactivateAsync(string article, string name, Func<Task> inactivate)
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Confirmar inativação",
+            $"Inativar {article} \"{name}\"? Cadastros inativados não são excluídos e continuam no histórico, mas deixam de aparecer nas listas de escolha.",
+            yesText: "Inativar",
+            cancelText: "Cancelar");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await inactivate();
+            Snackbar.Add($"\"{name}\" inativado.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (ApiProblemException problem)
+        {
+            Snackbar.Add(problem.Message, Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("Não foi possível falar com o servidor. Tente novamente.", Severity.Error);
+        }
+    }
+}

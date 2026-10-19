@@ -1,0 +1,56 @@
+@inject InventoryReferenceClient Reference
+
+@* Criar ou editar órgão (RF-019). Nome e sigla únicos, conferidos pela API (409 no aviso). *@
+<MudDialog>
+    <TitleContent><MudText Typo="Typo.h6">@(Existing is null ? "Novo órgão" : "Editar órgão")</MudText></TitleContent>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudTextField @bind-Value="_request.Name" Label="Nome" Variant="Variant.Outlined" Required="true" MaxLength="120"
+                          Error="@_errors.Has("name")" ErrorText="@_errors.For("name")" />
+            <MudTextField @bind-Value="_request.Acronym" Label="Sigla" Variant="Variant.Outlined" Required="true" MaxLength="15"
+                          Error="@_errors.Has("acronym")" ErrorText="@_errors.For("acronym")" />
+            <SaveErrorAlert Message="@_error" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="_saving">
+            @(_saving ? "Salvando…" : "Salvar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly FieldErrors _errors = new();
+    private OrganizationRequest _request = new();
+    private string? _error;
+    private bool _saving;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = null!;
+
+    [Parameter]
+    public OrganizationData? Existing { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (Existing is not null)
+        {
+            _request = new OrganizationRequest { Name = Existing.Name, Acronym = Existing.Acronym };
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        (_error, var saved) = await SaveForm.RunAsync(_errors, ["name", "acronym"], () => Existing is null
+            ? Reference.CreateOrganizationAsync(_request)
+            : Reference.UpdateOrganizationAsync(Existing.Id, _request));
+        _saving = false;
+
+        if (saved is not null)
+        {
+            Dialog.Close(DialogResult.Ok(saved));
+        }
+    }
+}

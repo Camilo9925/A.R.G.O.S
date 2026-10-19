@@ -1,0 +1,90 @@
+@inject InventoryReferenceClient Reference
+
+@* Criar ou editar bairro (RF-020): nome, região ativa e ponto central escolhido no mapa (RN-02, RN-22). *@
+<MudDialog>
+    <TitleContent><MudText Typo="Typo.h6">@(Existing is null ? "Novo bairro" : "Editar bairro")</MudText></TitleContent>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudTextField @bind-Value="_request.Name" Label="Nome" Variant="Variant.Outlined" Required="true" MaxLength="80"
+                          Error="@_errors.Has("name")" ErrorText="@_errors.For("name")" />
+            <MudSelect T="Guid?" @bind-Value="_request.RegionId" Label="Região" Variant="Variant.Outlined" Required="true"
+                       Error="@_errors.Has("regionId")" ErrorText="@_errors.For("regionId")">
+                @foreach (var region in Regions)
+                {
+                    <MudSelectItem T="Guid?" Value="@region.Id">@region.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudText Typo="Typo.body2">Ponto central: clique no mapa ou arraste o marcador.</MudText>
+            <LocationPicker Boundary="Municipality?.Boundary"
+                            Latitude="_request.Center?.Latitude"
+                            Longitude="_request.Center?.Longitude"
+                            OnPointSelected="SelectCenter"
+                            Small="true" />
+            <MudText Typo="Typo.caption">
+                @(_request.Center?.Latitude is { } latitude && _request.Center.Longitude is { } longitude
+                    ? $"Ponto escolhido: {latitude:0.######}, {longitude:0.######}"
+                    : "Nenhum ponto escolhido.")
+            </MudText>
+            @if ((_errors.For("center") ?? _errors.For("center.latitude") ?? _errors.For("center.longitude")) is { } centerError)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Error" role="alert">@centerError</MudText>
+            }
+            <SaveErrorAlert Message="@_error" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="_saving">
+            @(_saving ? "Salvando…" : "Salvar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly FieldErrors _errors = new();
+    private NeighborhoodRequest _request = new();
+    private string? _error;
+    private bool _saving;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = null!;
+
+    [Parameter]
+    public NeighborhoodData? Existing { get; set; }
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<RegionData> Regions { get; set; } = [];
+
+    [Parameter]
+    public MunicipalityData? Municipality { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (Existing is not null)
+        {
+            _request = new NeighborhoodRequest
+            {
+                Name = Existing.Name,
+                RegionId = Existing.RegionId,
+                Center = new GeoPointInput { Latitude = Existing.Center.Latitude, Longitude = Existing.Center.Longitude },
+            };
+        }
+    }
+
+    private void SelectCenter(GeoPointData point) =>
+        _request.Center = new GeoPointInput { Latitude = point.Latitude, Longitude = point.Longitude };
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        (_error, var saved) = await SaveForm.RunAsync(_errors, ["name", "regionId", "center"], () => Existing is null
+            ? Reference.CreateNeighborhoodAsync(_request)
+            : Reference.UpdateNeighborhoodAsync(Existing.Id, _request));
+        _saving = false;
+
+        if (saved is not null)
+        {
+            Dialog.Close(DialogResult.Ok(saved));
+        }
+    }
+}

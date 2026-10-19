@@ -1,0 +1,54 @@
+@inject InventoryReferenceClient Reference
+
+@* Criar ou renomear região (RF-020). Região criada aqui não tem contorno e não é desenhada no mapa (plan 15.2.1). *@
+<MudDialog>
+    <TitleContent><MudText Typo="Typo.h6">@(Existing is null ? "Nova região" : "Editar região")</MudText></TitleContent>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudTextField @bind-Value="_request.Name" Label="Nome" Variant="Variant.Outlined" Required="true" MaxLength="60"
+                          Error="@_errors.Has("name")" ErrorText="@_errors.For("name")" />
+            <SaveErrorAlert Message="@_error" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="_saving">
+            @(_saving ? "Salvando…" : "Salvar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly FieldErrors _errors = new();
+    private RegionRequest _request = new();
+    private string? _error;
+    private bool _saving;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = null!;
+
+    [Parameter]
+    public RegionData? Existing { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (Existing is not null)
+        {
+            _request = new RegionRequest { Name = Existing.Name };
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        (_error, var saved) = await SaveForm.RunAsync(_errors, ["name"], () => Existing is null
+            ? Reference.CreateRegionAsync(_request)
+            : Reference.UpdateRegionAsync(Existing.Id, _request));
+        _saving = false;
+
+        if (saved is not null)
+        {
+            Dialog.Close(DialogResult.Ok(saved));
+        }
+    }
+}

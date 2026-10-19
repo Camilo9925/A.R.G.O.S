@@ -1,0 +1,33 @@
+@* Filtros em uso, cada um removível, e "Limpar filtros" (US-03; Art. X.6). *@
+
+@if (Filters.Count > 0)
+{
+    <div class="argos-active-filters" role="region" aria-label="Filtros aplicados">
+        <MudText Typo="Typo.body2" Class="mr-2">Filtros aplicados:</MudText>
+        @foreach (var filter in Filters)
+        {
+            <MudChip T="string"
+                     Size="Size.Small"
+                     Variant="Variant.Outlined"
+                     OnClose="() => OnRemove.InvokeAsync(filter)"
+                     CloseIcon="@Icons.Material.Filled.Close">
+                @filter.Label
+            </MudChip>
+        }
+        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.FilterAltOff" OnClick="OnClear">
+            Limpar filtros
+        </MudButton>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ActiveFilter> Filters { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<ActiveFilter> OnRemove { get; set; }
+
+    [Parameter]
+    public EventCallback OnClear { get; set; }
+}

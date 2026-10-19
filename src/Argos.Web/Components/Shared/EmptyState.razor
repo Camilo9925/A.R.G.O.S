@@ -1,0 +1,29 @@
+@* Lista vazia: diz o que aconteceu e oferece o próximo passo (Art. X.6). *@
+
+<MudPaper Outlined="true" Class="pa-6 d-flex flex-column align-center" role="status">
+    <MudIcon Icon="@Icon" Size="Size.Large" aria-hidden="true" Class="mb-2" />
+    <MudText Typo="Typo.subtitle1" Align="Align.Center"><strong>@Title</strong></MudText>
+    @if (Description is not null)
+    {
+        <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-1">@Description</MudText>
+    }
+    @if (ChildContent is not null)
+    {
+        <div class="mt-3">@ChildContent</div>
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Description { get; set; }
+
+    [Parameter]
+    public string Icon { get; set; } = Icons.Material.Outlined.SearchOff;
+
+    /// <summary>Ação sugerida, como "Limpar filtros".</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

@@ -126,6 +126,75 @@ export function createMap(element, latitude, longitude, zoom, isDarkMode) {
   return id;
 }
 
+// Seletor de ponto (RF-005; plan 15.9): contorno do município, marcador arrastável e o ponto devolvido ao .NET a cada
+// clique ou arraste. Não confere se o ponto está dentro do município: quem decide é a API (RN-02; Art. III.4).
+const pinIcon = () =>
+  L.divIcon({ className: "argos-pin", html: "<span></span>", iconSize: [24, 24], iconAnchor: [12, 24] });
+
+const round6 = (value) => Math.round(value * 1e6) / 1e6;
+
+function placeMarker(entry, latitude, longitude) {
+  if (entry.marker) {
+    entry.marker.setLatLng([latitude, longitude]);
+    return;
+  }
+
+  entry.marker = L.marker([latitude, longitude], {
+    icon: pinIcon(),
+    draggable: !entry.readOnly,
+    keyboard: !entry.readOnly,
+    title: "Ponto escolhido",
+    alt: "Ponto escolhido",
+  }).addTo(entry.map);
+
+  if (!entry.readOnly) {
+    entry.marker.on("dragend", () => notifyPoint(entry));
+  }
+}
+
+function notifyPoint(entry) {
+  const point = entry.marker.getLatLng();
+  entry.dotNetRef?.invokeMethodAsync("OnPointSelected", round6(point.lat), round6(point.lng));
+}
+
+export function createPicker(element, options, dotNetRef) {
+  const id = createMap(element, options.latitude, options.longitude, options.zoom, options.isDarkMode);
+  const entry = maps.get(id);
+  entry.dotNetRef = dotNetRef;
+  entry.readOnly = options.readOnly;
+
+  if (options.boundary?.length) {
+    L.polygon(options.boundary, { color: "#00C2FF", weight: 2, fill: false, interactive: false, dashArray: "6 4" })
+      .addTo(entry.map);
+  }
+
+  if (options.point) {
+    placeMarker(entry, options.point[0], options.point[1]);
+  }
+
+  if (!options.readOnly) {
+    entry.map.on("click", (event) => {
+      placeMarker(entry, event.latlng.lat, event.latlng.lng);
+      notifyPoint(entry);
+    });
+  }
+
+  // Em diálogos e abas o contêiner ganha tamanho depois de criado.
+  setTimeout(() => entry.map.invalidateSize(), 250);
+  return id;
+}
+
+// Move o marcador para um ponto vindo do .NET (sugestão do CEP, coordenadas digitadas) e centraliza nele.
+export function setPickerPoint(id, latitude, longitude) {
+  const entry = maps.get(id);
+  if (!entry) {
+    return;
+  }
+
+  placeMarker(entry, latitude, longitude);
+  entry.map.panTo([latitude, longitude]);
+}
+
 export function setDarkMode(id, isDarkMode) {
   const entry = maps.get(id);
   if (!entry || entry.isDarkMode === isDarkMode) {
@@ -143,6 +212,7 @@ export function invalidateSize(id) {
 export function disposeMap(id) {
   const entry = maps.get(id);
   if (entry) {
+    entry.dotNetRef = undefined;
     entry.map.remove();
     maps.delete(id);
   }

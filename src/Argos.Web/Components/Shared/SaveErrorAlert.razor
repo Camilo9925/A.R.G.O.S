@@ -1,0 +1,10 @@
+@* Erro sem campo de um envio (regra de negócio, duplicidade, falha de rede), anunciado a leitores de tela (Art. X.6). *@
+@if (Message is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" role="alert">@Message</MudAlert>
+}
+
+@code {
+    [Parameter]
+    public string? Message { get; set; }
+}

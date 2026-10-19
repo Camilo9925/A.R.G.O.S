@@ -1,0 +1,66 @@
+@inject EquipmentClient Equipment
+
+@* Registrar manutenção (US-05, RN-08). Os erros voltam no próprio campo; os sem campo (RN-07, RN-11), no aviso. *@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Registrar manutenção</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MaintenanceFields Value="_request" Errors="_errors" />
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" Class="mt-3" role="alert">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="_saving">
+            @(_saving ? "Salvando…" : "Registrar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly RegisterMaintenanceRequest _request = new();
+    private readonly FieldErrors _errors = new();
+    private string? _error;
+    private bool _saving;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public Guid EquipmentId { get; set; }
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        _error = null;
+        _errors.Clear();
+
+        try
+        {
+            var maintenance = await Equipment.RegisterMaintenanceAsync(EquipmentId, _request);
+            Dialog.Close(DialogResult.Ok(maintenance));
+        }
+        catch (ApiProblemException problem) when (problem.IsValidation)
+        {
+            _errors.Load(problem.Errors);
+            _error = _errors.Except(["kind", "dueDate", "periodicityDays", "description"]).FirstOrDefault();
+        }
+        catch (ApiProblemException problem)
+        {
+            _error = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Tente novamente.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

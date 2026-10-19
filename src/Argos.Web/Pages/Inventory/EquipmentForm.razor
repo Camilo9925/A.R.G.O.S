@@ -1,0 +1,369 @@
+@page "/inventory/equipment/new"
+@page "/inventory/equipment/{Id:guid}/edit"
+
+@attribute [Authorize(Policy = Permissions.InventoryManage)]
+@inject EquipmentClient Equipment
+@inject InventoryReferenceClient Reference
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+@*
+    Cadastro e edição de equipamento (US-01, US-02, RF-002 a RF-007; plan 15.15). O formulário só coleta: quem valida é
+    a API, e cada erro volta no próprio campo (D-46). Fixo tem localização; móvel, base: a seção segue a categoria do
+    tipo escolhido.
+*@
+<PageTitle>@Title · ARGOS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudBreadcrumbs Items="Breadcrumbs" Class="px-0 pt-0" />
+    <MudText Typo="Typo.h4" HtmlTag="h1" Class="mb-3">@Title</MudText>
+
+    @if (_loadError is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" role="alert">@_loadError</MudAlert>
+    }
+    else if (!_loaded)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-hidden="true" />
+        <MudText Typo="Typo.body2" Class="mt-2" role="status">Carregando o formulário…</MudText>
+    }
+    else
+    {
+        @if (_existingId is { } existingId)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-3" role="alert">
+                @_error
+                <MudLink Href="@($"inventory/equipment/{existingId}")" Class="ml-2">Abrir equipamento existente</MudLink>
+            </MudAlert>
+        }
+        else if (_conflict)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-3" role="alert">
+                @_error
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="ReloadAsync" Class="ml-2">
+                    Recarregar os dados (descarta as suas alterações)
+                </MudButton>
+            </MudAlert>
+        }
+        else if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-3" role="alert">@_error</MudAlert>
+        }
+
+        <MudStack Spacing="3">
+            <MudPaper Outlined="true" Class="pa-4">
+                <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-3">Identificação</MudText>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        @if (IsEdit)
+                        {
+                            <MudTextField Value="@(_type?.Name ?? string.Empty)" Label="Tipo" Variant="Variant.Outlined" ReadOnly="true"
+                                          HelperText="O tipo não muda depois do cadastro." />
+                        }
+                        else
+                        {
+                            <MudSelect T="Guid?" Value="_create.TypeId" ValueChanged="SelectTypeAsync" Label="Tipo"
+                                       Variant="Variant.Outlined" Required="true" AnchorOrigin="Origin.BottomCenter"
+                                       Error="@_errors.Has("typeId")" ErrorText="@_errors.For("typeId")">
+                                @foreach (var type in _types)
+                                {
+                                    <MudSelectItem T="Guid?" Value="@type.Id">
+                                        <EquipmentTypeIcon IconKey="@type.Icon" Name="@($"{type.Name} ({InventoryLabels.For(type.Category)})")" />
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="Guid?" @bind-Value="Form.OrganizationId" Label="Órgão responsável" Variant="Variant.Outlined"
+                                   Required="true" AnchorOrigin="Origin.BottomCenter"
+                                   Error="@_errors.Has("organizationId")" ErrorText="@_errors.For("organizationId")">
+                            @foreach (var organization in _organizations)
+                            {
+                                <MudSelectItem T="Guid?" Value="@organization.Id">@organization.Acronym · @organization.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="Form.SerialNumber" Label="Número de série" Variant="Variant.Outlined" Required="true"
+                                      MaxLength="50" Error="@_errors.Has("serialNumber")" ErrorText="@_errors.For("serialNumber")" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="Form.Brand" Label="Marca" Variant="Variant.Outlined" Required="true"
+                                      MaxLength="60" Error="@_errors.Has("brand")" ErrorText="@_errors.For("brand")" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="Form.Model" Label="Modelo" Variant="Variant.Outlined" Required="true"
+                                      MaxLength="60" Error="@_errors.Has("model")" ErrorText="@_errors.For("model")" />
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            @if (_type is not null)
+            {
+                <MudPaper Outlined="true" Class="pa-4">
+                    <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-3">Características de @_type.Name.ToLowerInvariant()</MudText>
+                    <DynamicAttributeFields Type="_type" Values="Form.Attributes" Errors="_errors" />
+                </MudPaper>
+
+                @if (_type.Category == EquipmentCategory.Fixed)
+                {
+                    <MudPaper Outlined="true" Class="pa-4">
+                        <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-3">Localização</MudText>
+                        <LocationFields Value="Location" Errors="_errors" Municipality="_municipality" Neighborhoods="_neighborhoods" />
+                    </MudPaper>
+                }
+                else
+                {
+                    <MudPaper Outlined="true" Class="pa-4">
+                        <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-1">Base operacional</MudText>
+                        <MudText Typo="Typo.body2" Class="mb-3">A posição de um equipamento móvel vem da telemetria; aqui fica a base dele.</MudText>
+                        <MudSelect T="Guid?" @bind-Value="Form.BaseId" Label="Base" Variant="Variant.Outlined" Required="true"
+                                   AnchorOrigin="Origin.BottomCenter" Error="@_errors.Has("baseId")" ErrorText="@_errors.For("baseId")">
+                            @foreach (var operationalBase in _bases)
+                            {
+                                <MudSelectItem T="Guid?" Value="@operationalBase.Id">
+                                    @operationalBase.Name (@operationalBase.OrganizationAcronym) · @operationalBase.Location.NeighborhoodName
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudPaper>
+                }
+            }
+
+            @if (!IsEdit)
+            {
+                <MudPaper Outlined="true" Class="pa-4">
+                    <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-3">Situação e manutenção inicial</MudText>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="EquipmentStatus?" @bind-Value="_create.Status" Label="Situação inicial" Variant="Variant.Outlined"
+                                       Required="true" Error="@_errors.Has("status")" ErrorText="@_errors.For("status")">
+                                @foreach (var (status, _) in StatusTokens.All)
+                                {
+                                    <MudSelectItem T="EquipmentStatus?" Value="@status"><StatusBadge Status="status" /></MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" Class="d-flex align-center">
+                            <MudSwitch T="bool" @bind-Value="_withMaintenance" Color="Color.Primary" Label="Registrar uma manutenção já no cadastro" />
+                        </MudItem>
+                    </MudGrid>
+                    @if (_withMaintenance)
+                    {
+                        <div class="mt-3">
+                            <MaintenanceFields Value="_initialMaintenance" Errors="_errors" Prefix="initialMaintenance" />
+                        </div>
+                    }
+                </MudPaper>
+            }
+
+            <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
+                <MudButton Href="@CancelHref" Variant="Variant.Text">Cancelar</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_saving"
+                           StartIcon="@Icons.Material.Filled.Save">
+                    @(_saving ? "Salvando…" : IsEdit ? "Salvar alterações" : "Cadastrar equipamento")
+                </MudButton>
+            </MudStack>
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+    private static readonly string[] ShownFields =
+    [
+        "typeId", "organizationId", "serialNumber", "brand", "model", "attributes", "location", "baseId", "status",
+        "initialMaintenance", "version",
+    ];
+
+    private readonly FieldErrors _errors = new();
+    private readonly CreateEquipmentRequest _create = new() { Status = EquipmentStatus.Operational };
+    private readonly RegisterMaintenanceRequest _initialMaintenance = new();
+    private UpdateEquipmentRequest _update = new();
+    private IReadOnlyList<EquipmentTypeData> _types = [];
+    private List<OrganizationData> _organizations = [];
+    private List<OperationalBaseData> _bases = [];
+    private IReadOnlyList<NeighborhoodData> _neighborhoods = [];
+    private MunicipalityData? _municipality;
+    private EquipmentTypeData? _type;
+    private bool _withMaintenance;
+    private bool _loaded;
+    private bool _saving;
+    private bool _conflict;
+    private Guid? _existingId;
+    private string? _error;
+    private string? _loadError;
+
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    private bool IsEdit => Id is not null;
+
+    private EquipmentRegistrationRequest Form => IsEdit ? _update : _create;
+
+    private LocationInput Location => Form.Location ??= new LocationInput();
+
+    private string Title => IsEdit ? "Editar equipamento" : "Novo equipamento";
+
+    private string CancelHref => IsEdit ? $"inventory/equipment/{Id}" : "inventory/equipment";
+
+    private List<BreadcrumbItem> Breadcrumbs =>
+    [
+        new("Equipamentos", "inventory/equipment"),
+        new(Title, null, disabled: true),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var types = Reference.ListEquipmentTypesAsync();
+            var organizations = Reference.ListOrganizationsAsync();
+            var bases = Reference.ListOperationalBasesAsync();
+            var neighborhoods = Reference.ListNeighborhoodsAsync();
+            var municipality = Reference.GetMunicipalityAsync();
+            _types = await types;
+            _organizations = [.. await organizations];
+            _bases = [.. await bases];
+            _neighborhoods = await neighborhoods;
+            _municipality = await municipality;
+
+            if (Id is { } id)
+            {
+                await LoadEquipmentAsync(id);
+            }
+
+            _loaded = true;
+        }
+        catch (ApiProblemException problem)
+        {
+            _loadError = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _loadError = "Não foi possível falar com o servidor. Recarregue a página para tentar de novo.";
+        }
+    }
+
+    /// <summary>Preenche a edição com o cadastro atual e a versão lida (D-60).</summary>
+    private async Task LoadEquipmentAsync(Guid id)
+    {
+        var details = await Equipment.GetAsync(id);
+        _type = _types.FirstOrDefault(type => type.Id == details.TypeId);
+        _update = new UpdateEquipmentRequest
+        {
+            SerialNumber = details.SerialNumber,
+            Brand = details.Brand,
+            Model = details.Model,
+            OrganizationId = details.OrganizationId,
+            BaseId = details.BaseId,
+            Location = details.Location is { } location
+                ? new LocationInput
+                {
+                    ZipCode = location.ZipCode,
+                    Street = location.Street,
+                    NeighborhoodId = location.NeighborhoodId,
+                    Reference = location.Reference,
+                    Latitude = location.Latitude,
+                    Longitude = location.Longitude,
+                }
+                : null,
+            Attributes = details.Attributes.ToDictionary(attribute => attribute.Key, attribute => (string?)attribute.Value),
+            Version = details.Version,
+        };
+
+        // Órgão e base inativados continuam aceitos para quem já os tinha: aparecem na lista com o nome lido.
+        if (_organizations.All(organization => organization.Id != details.OrganizationId))
+        {
+            _organizations.Add(new OrganizationData
+            {
+                Id = details.OrganizationId, Name = details.OrganizationName, Acronym = details.OrganizationAcronym,
+            });
+        }
+
+        if (details.BaseId is { } baseId && _bases.All(operationalBase => operationalBase.Id != baseId))
+        {
+            _bases.Add(new OperationalBaseData { Id = baseId, Name = details.BaseName ?? string.Empty });
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        _conflict = false;
+        _error = null;
+        _errors.Clear();
+        await LoadEquipmentAsync(Id!.Value);
+    }
+
+    private Task SelectTypeAsync(Guid? typeId)
+    {
+        _create.TypeId = typeId;
+        _type = _types.FirstOrDefault(type => type.Id == typeId);
+        _create.Attributes = [];
+        _create.Location = null;
+        _create.BaseId = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        _error = null;
+        _existingId = null;
+        _conflict = false;
+        _errors.Clear();
+
+        // A seção que não se aplica à categoria do tipo não vai.
+        if (_type?.Category == EquipmentCategory.Fixed)
+        {
+            Form.BaseId = null;
+        }
+        else
+        {
+            Form.Location = null;
+        }
+
+        try
+        {
+            EquipmentDetails saved;
+            if (Id is { } id)
+            {
+                saved = await Equipment.UpdateAsync(id, _update);
+            }
+            else
+            {
+                _create.InitialMaintenance = _withMaintenance ? _initialMaintenance : null;
+                saved = await Equipment.CreateAsync(_create);
+            }
+
+            Snackbar.Add(IsEdit ? "Alterações salvas." : "Equipamento cadastrado.", Severity.Success);
+            Navigation.NavigateTo($"inventory/equipment/{saved.Id}");
+        }
+        catch (ApiProblemException problem) when (problem.IsValidation)
+        {
+            _errors.Load(problem.Errors);
+            var others = _errors.Except(ShownFields).ToArray();
+            _error = others.Length > 0
+                ? string.Join(" ", others)
+                : "Corrija os campos indicados e tente novamente.";
+        }
+        catch (ApiProblemException problem) when (problem.Status == System.Net.HttpStatusCode.Conflict)
+        {
+            _existingId = problem.ExistingEquipmentId;
+            _conflict = _existingId is null && IsEdit;
+            _error = problem.Message;
+        }
+        catch (ApiProblemException problem)
+        {
+            _error = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Seus dados continuam no formulário; tente novamente.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

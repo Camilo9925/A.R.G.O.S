@@ -1,0 +1,29 @@
+@* Legenda das situações e das necessidades de manutenção (Art. X.2, XI.2). *@
+
+<MudExpansionPanels Elevation="0" Outlined="true" Class="mb-3">
+    <MudExpansionPanel Text="Legenda">
+        <MudStack Spacing="2">
+            <div>
+                <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mb-1">Situação</MudText>
+                <div class="argos-legend">
+                    @foreach (var (_, token) in StatusTokens.All)
+                    {
+                        <TokenBadge Token="token" />
+                    }
+                </div>
+            </div>
+            <div>
+                <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mb-1">Necessidade de manutenção</MudText>
+                <div class="argos-legend">
+                    @foreach (var (_, token) in MaintenanceNeedTokens.All)
+                    {
+                        <TokenBadge Token="token" />
+                    }
+                </div>
+                <MudText Typo="Typo.caption">
+                    Imediata: manutenção sem data, a fazer já. Vencida: a data prevista já passou. Próxima: a data prevista está dentro do prazo de manutenção próxima. Programada: data prevista mais adiante.
+                </MudText>
+            </div>
+        </MudStack>
+    </MudExpansionPanel>
+</MudExpansionPanels>

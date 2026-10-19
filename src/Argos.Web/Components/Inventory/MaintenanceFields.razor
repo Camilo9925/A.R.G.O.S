@@ -1,0 +1,68 @@
+@*
+    Campos de uma manutenção a registrar (RF-009, RN-08), no cadastro (manutenção inicial) e no diálogo. Os três campos
+    ficam sempre visíveis, com o rótulo dizendo a que tipo servem: quem confere a combinação é a API, e os erros voltam
+    no próprio campo (Art. III.4).
+*@
+<MudGrid Spacing="2">
+    <MudItem xs="12" sm="6">
+        <MudSelect T="MaintenanceKind?"
+                   @bind-Value="Value.Kind"
+                   Label="Tipo de manutenção"
+                   Variant="Variant.Outlined"
+                   Required="true"
+                   Error="@Errors.Has(Field("kind"))"
+                   ErrorText="@Errors.For(Field("kind"))">
+            @foreach (var kind in Enum.GetValues<MaintenanceKind>())
+            {
+                <MudSelectItem T="MaintenanceKind?" Value="@kind">@InventoryLabels.For(kind)</MudSelectItem>
+            }
+        </MudSelect>
+    </MudItem>
+    <MudItem xs="12" sm="6">
+        <MudDatePicker Date="DueDate"
+                       Editable="true"
+                       DateChanged="SetDueDate"
+                       Label="Data prevista (agendada e periódica)"
+                       Variant="Variant.Outlined"
+                       DateFormat="dd/MM/yyyy"
+                       Clearable="true"
+                       Error="@Errors.Has(Field("dueDate"))"
+                       ErrorText="@Errors.For(Field("dueDate"))" />
+    </MudItem>
+    <MudItem xs="12" sm="6">
+        <MudNumericField T="int?"
+                         @bind-Value="Value.PeriodicityDays"
+                         Label="Periodicidade em dias (só periódica)"
+                         Variant="Variant.Outlined"
+                         HideSpinButtons="true"
+                         Error="@Errors.Has(Field("periodicityDays"))"
+                         ErrorText="@Errors.For(Field("periodicityDays"))" />
+    </MudItem>
+    <MudItem xs="12">
+        <MudTextField @bind-Value="Value.Description"
+                      Label="Descrição (opcional)"
+                      Variant="Variant.Outlined"
+                      Lines="2"
+                      MaxLength="500"
+                      Error="@Errors.Has(Field("description"))"
+                      ErrorText="@Errors.For(Field("description"))" />
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter, EditorRequired]
+    public RegisterMaintenanceRequest Value { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public FieldErrors Errors { get; set; } = new();
+
+    /// <summary>Prefixo dos erros da API: vazio no diálogo, <c>initialMaintenance</c> no cadastro.</summary>
+    [Parameter]
+    public string? Prefix { get; set; }
+
+    private DateTime? DueDate => Value.DueDate?.ToDateTime(TimeOnly.MinValue);
+
+    private void SetDueDate(DateTime? date) => Value.DueDate = date is { } value ? DateOnly.FromDateTime(value) : null;
+
+    private string Field(string name) => Prefix is null ? name : $"{Prefix}.{name}";
+}

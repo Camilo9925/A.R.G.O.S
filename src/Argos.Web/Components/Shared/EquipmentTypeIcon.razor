@@ -1,0 +1,24 @@
+@* Ícone do tipo com o nome ao lado ou como texto alternativo (Art. X.2). *@
+
+<span class="argos-type">
+    <MudIcon Icon="@InventoryLabels.IconFor(IconKey)" Size="@Size" aria-hidden="@(ShowName ? "true" : null)"
+             Title="@(ShowName ? null : Name)" />
+    @if (ShowName)
+    {
+        <span>@Name</span>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public string IconKey { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Name { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool ShowName { get; set; } = true;
+
+    [Parameter]
+    public Size Size { get; set; } = Size.Small;
+}

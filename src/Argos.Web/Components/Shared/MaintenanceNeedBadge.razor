@@ -1,0 +1,9 @@
+@using Argos.Contracts.Inventory
+
+@* Necessidade de manutenção (RN-10), calculada pela API (D-54), com cor, ícone e texto (Art. X.2). *@
+<TokenBadge Token="MaintenanceNeedTokens.For(Need)" />
+
+@code {
+    [Parameter, EditorRequired]
+    public MaintenanceNeed Need { get; set; }
+}

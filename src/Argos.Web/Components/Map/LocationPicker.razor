@@ -1,0 +1,112 @@
+@using Argos.Web.Interop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+@inject MapOptions Options
+
+@*
+    Seletor de ponto no mapa (RF-005; plan 15.9): clicar ou arrastar o marcador devolve latitude e longitude. O contorno
+    do município é só referência visual: estar dentro dele é conferido pela API (RN-02; Art. III.4).
+*@
+<div @ref="_element"
+     class="@($"argos-map argos-picker{(Small ? " argos-picker--small" : string.Empty)}")"
+     role="region"
+     aria-label="@AriaLabel"></div>
+
+@code {
+    private const int PointZoom = 16;
+
+    private ElementReference _element;
+    private LeafletMapInterop? _interop;
+    private DotNetObjectReference<LocationPicker>? _receiver;
+    private (double, double)? _shownPoint;
+    private bool _renderedDarkMode;
+
+    [CascadingParameter(Name = "IsDarkMode")]
+    public bool IsDarkMode { get; set; } = true;
+
+    /// <summary>Contorno do município (anéis do <c>MunicipalityData</c>); o primeiro é desenhado.</summary>
+    [Parameter]
+    public IReadOnlyList<IReadOnlyList<GeoPointData>>? Boundary { get; set; }
+
+    [Parameter]
+    public double? Latitude { get; set; }
+
+    [Parameter]
+    public double? Longitude { get; set; }
+
+    [Parameter]
+    public EventCallback<GeoPointData> OnPointSelected { get; set; }
+
+    /// <summary>Minimapa só para mostrar o ponto, sem seleção.</summary>
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    [Parameter]
+    public bool Small { get; set; }
+
+    private string AriaLabel => ReadOnly
+        ? "Mapa com a localização"
+        : "Mapa para escolher o ponto: clique no local ou arraste o marcador";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _interop = new LeafletMapInterop(JSRuntime);
+            _receiver = ReadOnly ? null : DotNetObjectReference.Create(this);
+            var point = CurrentPoint;
+            await _interop.CreatePickerAsync(
+                _element,
+                new PickerOptions(
+                    point?.Item1 ?? Options.CenterLatitude,
+                    point?.Item2 ?? Options.CenterLongitude,
+                    point is null ? Options.Zoom : PointZoom,
+                    IsDarkMode,
+                    Boundary is { Count: > 0 } rings ? rings[0].Select(vertex => new[] { vertex.Latitude, vertex.Longitude }).ToArray() : null,
+                    point is { } selected ? [selected.Item1, selected.Item2] : null,
+                    ReadOnly),
+                _receiver);
+            _shownPoint = point;
+            _renderedDarkMode = IsDarkMode;
+            return;
+        }
+
+        if (_interop is null)
+        {
+            return;
+        }
+
+        if (_renderedDarkMode != IsDarkMode)
+        {
+            await _interop.SetDarkModeAsync(IsDarkMode);
+            _renderedDarkMode = IsDarkMode;
+        }
+
+        // Ponto alterado fora do mapa (sugestão do CEP, coordenadas digitadas): move o marcador.
+        if (CurrentPoint is { } current && current != _shownPoint)
+        {
+            _shownPoint = current;
+            await _interop.SetPickerPointAsync(current.Item1, current.Item2);
+        }
+    }
+
+    [JSInvokable("OnPointSelected")]
+    public async Task NotifyPointSelectedAsync(double latitude, double longitude)
+    {
+        _shownPoint = (latitude, longitude);
+        await OnPointSelected.InvokeAsync(new GeoPointData(latitude, longitude));
+    }
+
+    private (double, double)? CurrentPoint =>
+        Latitude is { } latitude && Longitude is { } longitude ? (latitude, longitude) : null;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_interop is not null)
+        {
+            await _interop.DisposeAsync();
+        }
+
+        _receiver?.Dispose();
+    }
+}

@@ -1,0 +1,184 @@
+@inject InventoryReferenceClient Reference
+
+@*
+    Localização de equipamento fixo ou de base (RF-003 a RF-005; plan 15.9): CEP com sugestão ao sair do campo, rua,
+    bairro, cidade e UF do município (somente leitura, D-50), referência (RN-03) e o ponto no mapa. Quem valida tudo é
+    a API; os erros chegam por campo, com o prefixo do objeto (location.zipCode…).
+*@
+<MudGrid Spacing="2">
+    <MudItem xs="12" sm="4">
+        <MudTextField @bind-Value="Value.ZipCode"
+                      Label="CEP"
+                      Placeholder="00000-000"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      OnBlur="SuggestAsync"
+                      Adornment="Adornment.End"
+                      AdornmentIcon="@(_suggesting ? Icons.Material.Filled.HourglassTop : Icons.Material.Filled.Search)"
+                      OnAdornmentClick="SuggestAsync"
+                      AdornmentAriaLabel="Buscar endereço pelo CEP"
+                      HelperText="Ao sair do campo, o endereço é sugerido."
+                      Error="@(_zipError is not null || Errors.Has(Field("zipCode")))"
+                      ErrorText="@(_zipError ?? Errors.For(Field("zipCode")))" />
+    </MudItem>
+    <MudItem xs="12" sm="8">
+        <MudTextField @bind-Value="Value.Street"
+                      Label="Rua"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      Error="@Errors.Has(Field("street"))"
+                      ErrorText="@Errors.For(Field("street"))" />
+    </MudItem>
+    @if (_suggestionNotice is not null)
+    {
+        <MudItem xs="12">
+            <MudAlert Severity="@_suggestionSeverity" Dense="true" Variant="Variant.Outlined" role="status">
+                @_suggestionNotice
+            </MudAlert>
+        </MudItem>
+    }
+    <MudItem xs="12" sm="6">
+        <MudSelect T="Guid?"
+                   @bind-Value="Value.NeighborhoodId"
+                   Label="Bairro"
+                   Variant="Variant.Outlined"
+                   Required="true"
+                   AnchorOrigin="Origin.BottomCenter"
+                   Error="@Errors.Has(Field("neighborhoodId"))"
+                   ErrorText="@Errors.For(Field("neighborhoodId"))">
+            @foreach (var neighborhood in Neighborhoods)
+            {
+                <MudSelectItem T="Guid?" Value="@neighborhood.Id">@neighborhood.Name (@neighborhood.RegionName)</MudSelectItem>
+            }
+        </MudSelect>
+    </MudItem>
+    <MudItem xs="8" sm="4">
+        <MudTextField Value="@(Municipality?.Name ?? string.Empty)" Label="Cidade" Variant="Variant.Outlined"
+                      ReadOnly="true" HelperText="Sempre a do município." />
+    </MudItem>
+    <MudItem xs="4" sm="2">
+        <MudTextField Value="@(Municipality?.State ?? string.Empty)" Label="UF" Variant="Variant.Outlined" ReadOnly="true" />
+    </MudItem>
+    <MudItem xs="12">
+        <MudTextField @bind-Value="Value.Reference"
+                      Label="Referência"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      HelperText="Por exemplo: número 181, oposto ao número 181, KM 203 ou S/N."
+                      Error="@Errors.Has(Field("reference"))"
+                      ErrorText="@Errors.For(Field("reference"))" />
+    </MudItem>
+    <MudItem xs="12">
+        <MudText Typo="Typo.body2" Class="mb-1">Clique no mapa ou arraste o marcador para escolher o ponto exato.</MudText>
+        <LocationPicker Boundary="Municipality?.Boundary"
+                        Latitude="Value.Latitude"
+                        Longitude="Value.Longitude"
+                        OnPointSelected="SelectPoint" />
+    </MudItem>
+    <MudItem xs="6">
+        <MudNumericField T="double?"
+                         @bind-Value="Value.Latitude"
+                         Label="Latitude"
+                         Variant="Variant.Outlined"
+                         Format="0.######"
+                         HideSpinButtons="true"
+                         Required="true"
+                         Error="@Errors.Has(Field("latitude"))"
+                         ErrorText="@Errors.For(Field("latitude"))" />
+    </MudItem>
+    <MudItem xs="6">
+        <MudNumericField T="double?"
+                         @bind-Value="Value.Longitude"
+                         Label="Longitude"
+                         Variant="Variant.Outlined"
+                         Format="0.######"
+                         HideSpinButtons="true"
+                         Required="true"
+                         Error="@Errors.Has(Field("longitude"))"
+                         ErrorText="@Errors.For(Field("longitude"))" />
+    </MudItem>
+    @if (Errors.For(Prefix) is { } locationError)
+    {
+        <MudItem xs="12">
+            <MudAlert Severity="Severity.Error" Dense="true" Variant="Variant.Outlined" role="alert">@locationError</MudAlert>
+        </MudItem>
+    }
+</MudGrid>
+
+@code {
+    private bool _suggesting;
+    private string? _zipError;
+    private string? _suggestionNotice;
+    private Severity _suggestionSeverity = Severity.Info;
+    private string? _lastSuggested;
+
+    [Parameter, EditorRequired]
+    public LocationInput Value { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public FieldErrors Errors { get; set; } = new();
+
+    /// <summary>Prefixo dos erros da API para este objeto.</summary>
+    [Parameter]
+    public string Prefix { get; set; } = "location";
+
+    [Parameter]
+    public MunicipalityData? Municipality { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<NeighborhoodData> Neighborhoods { get; set; } = [];
+
+    private string Field(string name) => $"{Prefix}.{name}";
+
+    private void SelectPoint(GeoPointData point)
+    {
+        Value.Latitude = point.Latitude;
+        Value.Longitude = point.Longitude;
+    }
+
+    /// <summary>Sugestão por CEP (RF-004): preenche rua, bairro e ponto, que continuam ajustáveis.</summary>
+    private async Task SuggestAsync()
+    {
+        var zipCode = Value.ZipCode?.Trim();
+        if (string.IsNullOrEmpty(zipCode) || zipCode == _lastSuggested || _suggesting)
+        {
+            return;
+        }
+
+        _suggesting = true;
+        _zipError = null;
+        _suggestionNotice = null;
+
+        try
+        {
+            var suggestion = await Reference.SuggestAddressAsync(zipCode);
+            Value.ZipCode = suggestion.ZipCode;
+            Value.Street = suggestion.Street;
+            Value.NeighborhoodId = suggestion.NeighborhoodId;
+            Value.Latitude = suggestion.Latitude;
+            Value.Longitude = suggestion.Longitude;
+            _lastSuggested = suggestion.ZipCode;
+            _suggestionSeverity = Severity.Success;
+            _suggestionNotice = $"Endereço sugerido pelo CEP: {suggestion.Street}, {suggestion.NeighborhoodName}. Ajuste o ponto e a referência.";
+        }
+        catch (ApiProblemException problem) when (problem.IsValidation)
+        {
+            _zipError = problem.Errors.Values.SelectMany(messages => messages).FirstOrDefault() ?? problem.Message;
+        }
+        catch (ApiProblemException problem)
+        {
+            _lastSuggested = zipCode;
+            _suggestionSeverity = Severity.Info;
+            _suggestionNotice = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _suggestionSeverity = Severity.Warning;
+            _suggestionNotice = "Não foi possível consultar o CEP agora. Preencha o endereço manualmente.";
+        }
+        finally
+        {
+            _suggesting = false;
+        }
+    }
+}

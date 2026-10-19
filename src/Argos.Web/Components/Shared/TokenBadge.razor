@@ -1,0 +1,12 @@
+@* Selo de situação ou de necessidade: a cor fica no contorno e no ícone, sempre com o texto (Art. X.2, XI.2). *@
+
+<span class="@($"argos-badge{(Token.IsOutlined ? " argos-badge--outlined" : string.Empty)}")"
+      style="@($"--argos-badge-color: {Token.Color}")">
+    <MudIcon Icon="@Token.Icon" Size="Size.Small" aria-hidden="true" Class="argos-badge-icon" />
+    <span>@Token.Label</span>
+</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public StatusToken Token { get; set; } = null!;
+}

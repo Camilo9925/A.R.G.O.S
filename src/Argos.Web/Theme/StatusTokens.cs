@@ -1,3 +1,4 @@
+using Argos.Contracts.Inventory;
 using MudBlazor;
 
 namespace Argos.Web.Theme;
@@ -12,7 +13,7 @@ namespace Argos.Web.Theme;
 public sealed record StatusToken(string Label, string Color, string Icon, bool IsOutlined = false);
 
 /// <summary>
-/// Cores de situação semânticas e consistentes em todo o sistema (Art. XI.2). Ainda sem uso na Fase 0.
+/// Cores de situação semânticas e consistentes em todo o sistema (Art. XI.2), da lista do Inventário ao mapa da Central.
 /// </summary>
 public static class StatusTokens
 {
@@ -33,4 +34,26 @@ public static class StatusTokens
 
     public static StatusToken NotInstalled { get; } =
         new("Ainda não instalado", ArgosTheme.Ice, Icons.Material.Outlined.RadioButtonUnchecked, IsOutlined: true);
+
+    /// <summary>Todas, na ordem do ciclo de vida, para a legenda.</summary>
+    public static IReadOnlyList<(EquipmentStatus Status, StatusToken Token)> All { get; } =
+    [
+        (EquipmentStatus.NotInstalled, NotInstalled),
+        (EquipmentStatus.Operational, Operational),
+        (EquipmentStatus.Malfunction, Malfunction),
+        (EquipmentStatus.UnderMaintenance, UnderMaintenance),
+        (EquipmentStatus.Deactivated, Deactivated),
+        (EquipmentStatus.Stolen, Stolen),
+    ];
+
+    public static StatusToken For(EquipmentStatus status) => status switch
+    {
+        EquipmentStatus.NotInstalled => NotInstalled,
+        EquipmentStatus.Operational => Operational,
+        EquipmentStatus.Malfunction => Malfunction,
+        EquipmentStatus.UnderMaintenance => UnderMaintenance,
+        EquipmentStatus.Deactivated => Deactivated,
+        EquipmentStatus.Stolen => Stolen,
+        _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Situação desconhecida."),
+    };
 }

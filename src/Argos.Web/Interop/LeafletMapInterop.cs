@@ -17,6 +17,28 @@ public sealed class LeafletMapInterop(IJSRuntime jsRuntime) : IAsyncDisposable
         _mapId = await _module.InvokeAsync<int>("createMap", element, latitude, longitude, zoom, isDarkMode);
     }
 
+    /// <summary>
+    /// Mapa de seleção de ponto (plan 15.9): contorno do município, marcador arrastável e, fora do modo somente
+    /// leitura, o ponto devolvido a <paramref name="receiver"/> pelo método <c>OnPointSelected(latitude, longitude)</c>.
+    /// </summary>
+    public async Task CreatePickerAsync<TReceiver>(
+        ElementReference element,
+        PickerOptions options,
+        DotNetObjectReference<TReceiver>? receiver)
+        where TReceiver : class
+    {
+        _module ??= await jsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/map.js");
+        _mapId = await _module.InvokeAsync<int>("createPicker", element, options, receiver);
+    }
+
+    public async Task SetPickerPointAsync(double latitude, double longitude)
+    {
+        if (_module is not null && _mapId is { } id)
+        {
+            await _module.InvokeVoidAsync("setPickerPoint", id, latitude, longitude);
+        }
+    }
+
     public async Task SetDarkModeAsync(bool isDarkMode)
     {
         if (_module is not null && _mapId is { } id)

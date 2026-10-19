@@ -1,0 +1,118 @@
+@inject EquipmentClient Equipment
+
+@*
+    Alterar situação (US-04): só as opções que a API devolveu em allowedStatusChanges, já filtradas pela permissão do
+    usuário (RN-05, D-47, D-59). A justificativa aparece quando a opção escolhida a exige (RN-06).
+*@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Alterar situação</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body2">Situação atual: <StatusBadge Status="Current" /></MudText>
+            <MudRadioGroup T="EquipmentStatus?" @bind-Value="_target" aria-label="Nova situação">
+                <MudStack Spacing="1">
+                    @foreach (var option in Options)
+                    {
+                        <MudRadio T="EquipmentStatus?" Value="@option.Status" Color="Color.Primary">
+                            <StatusBadge Status="option.Status" />
+                            @if (option.RequiresJustification)
+                            {
+                                <MudText Typo="Typo.caption" Class="ml-2" Inline="true">exige justificativa</MudText>
+                            }
+                        </MudRadio>
+                    }
+                </MudStack>
+            </MudRadioGroup>
+            @if (_errors.Has("status"))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Error" role="alert">@_errors.For("status")</MudText>
+            }
+            @if (Selected?.RequiresJustification == true)
+            {
+                <MudTextField @bind-Value="_justification"
+                              Label="Justificativa"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              MaxLength="500"
+                              Required="true"
+                              Error="@_errors.Has("justification")"
+                              ErrorText="@_errors.For("justification")" />
+            }
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" role="alert">@_error</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="@(_target is null || _saving)">
+            @(_saving ? "Salvando…" : "Confirmar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly FieldErrors _errors = new();
+    private EquipmentStatus? _target;
+    private string? _justification;
+    private string? _error;
+    private bool _saving;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public Guid EquipmentId { get; set; }
+
+    [Parameter, EditorRequired]
+    public EquipmentStatus Current { get; set; }
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<StatusChangeOptionData> Options { get; set; } = [];
+
+    private StatusChangeOptionData? Selected => Options.FirstOrDefault(option => option.Status == _target);
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        _error = null;
+        _errors.Clear();
+
+        try
+        {
+            var details = await Equipment.ChangeStatusAsync(
+                EquipmentId,
+                new ChangeEquipmentStatusRequest
+                {
+                    Status = _target,
+                    Justification = Selected?.RequiresJustification == true ? _justification : null,
+                });
+            Dialog.Close(DialogResult.Ok(details));
+        }
+        catch (ApiProblemException problem) when (problem.IsValidation)
+        {
+            _errors.Load(problem.Errors);
+            if (_errors.Except(["status", "justification"]).FirstOrDefault() is { } other)
+            {
+                _error = other;
+            }
+        }
+        catch (ApiProblemException problem)
+        {
+            _error = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Tente novamente.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

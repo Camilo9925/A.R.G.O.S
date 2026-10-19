@@ -1,0 +1,163 @@
+@using System.Globalization
+
+@*
+    Características do tipo, geradas das definições vindas da API (RF-006, US-02; plan 15.5). Cada valor vai como texto
+    invariante ("60", "12.5", "true", "cash,pix"). Obrigatoriedade, faixa e condição são só exibidas a partir da
+    definição: quem valida é a API, e os erros voltam em attributes.{chave} (Art. III.4; D-59).
+*@
+@if (Type.Attributes.Count == 0)
+{
+    <MudText Typo="Typo.body2">Este tipo não tem características próprias.</MudText>
+}
+else
+{
+    <MudGrid Spacing="2">
+        @foreach (var attribute in Type.Attributes.OrderBy(attribute => attribute.Order))
+        {
+            var key = attribute.Key;
+            var field = $"attributes.{key}";
+            <MudItem xs="12" sm="6" @key="key">
+                @switch (attribute.DataType)
+                {
+                    case AttributeDataType.Integer:
+                    case AttributeDataType.Decimal:
+                        <MudNumericField T="decimal?"
+                                         Value="ParseNumber(key)"
+                                         ValueChanged="value => SetNumber(key, value)"
+                                         Label="@LabelOf(attribute)"
+                                         Variant="Variant.Outlined"
+                                         Required="attribute.IsRequired"
+                                         HideSpinButtons="true"
+                                         HelperText="@HelperOf(attribute)"
+                                         Error="@Errors.Has(field)"
+                                         ErrorText="@Errors.For(field)" />
+                        break;
+                    case AttributeDataType.Boolean:
+                        <MudSelect T="string"
+                                   Value="ValueOf(key)"
+                                   ValueChanged="value => Set(key, value)"
+                                   Label="@LabelOf(attribute)"
+                                   Variant="Variant.Outlined"
+                                   Required="attribute.IsRequired"
+                                   Clearable="!attribute.IsRequired"
+                                   HelperText="@HelperOf(attribute)"
+                                   Error="@Errors.Has(field)"
+                                   ErrorText="@Errors.For(field)">
+                            <MudSelectItem T="string" Value="@("true")">Sim</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("false")">Não</MudSelectItem>
+                        </MudSelect>
+                        break;
+                    case AttributeDataType.Option:
+                        <MudSelect T="string"
+                                   Value="ValueOf(key)"
+                                   ValueChanged="value => Set(key, value)"
+                                   Label="@LabelOf(attribute)"
+                                   Variant="Variant.Outlined"
+                                   Required="attribute.IsRequired"
+                                   Clearable="!attribute.IsRequired"
+                                   HelperText="@HelperOf(attribute)"
+                                   Error="@Errors.Has(field)"
+                                   ErrorText="@Errors.For(field)">
+                            @foreach (var option in attribute.Options)
+                            {
+                                <MudSelectItem T="string" Value="@option.Key">@option.Label</MudSelectItem>
+                            }
+                        </MudSelect>
+                        break;
+                    case AttributeDataType.MultiOption:
+                        <MudSelect T="string"
+                                   MultiSelection="true"
+                                   SelectedValues="SelectedOf(key)"
+                                   SelectedValuesChanged="values => SetMany(key, values)"
+                                   ToStringFunc="@(optionKey => attribute.Options.FirstOrDefault(option => option.Key == optionKey)?.Label ?? optionKey)"
+                                   Label="@LabelOf(attribute)"
+                                   Variant="Variant.Outlined"
+                                   Required="attribute.IsRequired"
+                                   HelperText="@HelperOf(attribute)"
+                                   Error="@Errors.Has(field)"
+                                   ErrorText="@Errors.For(field)">
+                            @foreach (var option in attribute.Options)
+                            {
+                                <MudSelectItem T="string" Value="@option.Key">@option.Label</MudSelectItem>
+                            }
+                        </MudSelect>
+                        break;
+                    default:
+                        <MudTextField T="string"
+                                      Value="ValueOf(key)"
+                                      ValueChanged="value => Set(key, value)"
+                                      Label="@LabelOf(attribute)"
+                                      Variant="Variant.Outlined"
+                                      Required="attribute.IsRequired"
+                                      MaxLength="@(attribute.MaxLength ?? 524288)"
+                                      HelperText="@HelperOf(attribute)"
+                                      Error="@Errors.Has(field)"
+                                      ErrorText="@Errors.For(field)" />
+                        break;
+                }
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public EquipmentTypeData Type { get; set; } = new();
+
+    /// <summary>Valores no texto invariante do contrato, por chave; vazio significa não informado.</summary>
+    [Parameter, EditorRequired]
+    public Dictionary<string, string?> Values { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public FieldErrors Errors { get; set; } = new();
+
+    private static string LabelOf(EquipmentTypeAttributeData attribute) =>
+        attribute.Unit is null ? attribute.Label : $"{attribute.Label} ({attribute.Unit})";
+
+    /// <summary>Texto de apoio montado só com a definição: faixa e obrigatoriedade condicional.</summary>
+    private string? HelperOf(EquipmentTypeAttributeData attribute)
+    {
+        var parts = new List<string>();
+
+        if (attribute.Min is not null || attribute.Max is not null)
+        {
+            parts.Add((attribute.Min, attribute.Max) switch
+            {
+                ({ } min, { } max) => $"De {Number(min)} a {Number(max)}",
+                ({ } min, null) => $"A partir de {Number(min)}",
+                (null, { } max) => $"Até {Number(max)}",
+                _ => string.Empty,
+            });
+        }
+
+        if (attribute.RequiredWhen is { } condition
+            && Type.Attributes.FirstOrDefault(candidate => candidate.Key == condition.AttributeKey) is { } source)
+        {
+            var optionLabel = source.Options.FirstOrDefault(option => option.Key == condition.OptionKey)?.Label ?? condition.OptionKey;
+            parts.Add($"Obrigatório quando {source.Label.ToLowerInvariant()} é {optionLabel}");
+        }
+
+        return parts.Count == 0 ? null : string.Join(". ", parts) + ".";
+    }
+
+    private static string Number(decimal value) => value.ToString("0.##", CultureInfo.CurrentCulture);
+
+    private string? ValueOf(string key) => Values.TryGetValue(key, out var value) ? value : null;
+
+    private void Set(string key, string? value) => Values[key] = string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private decimal? ParseNumber(string key) =>
+        decimal.TryParse(ValueOf(key), NumberStyles.Number, CultureInfo.InvariantCulture, out var number) ? number : null;
+
+    private void SetNumber(string key, decimal? value) =>
+        Values[key] = value?.ToString(CultureInfo.InvariantCulture);
+
+    private IReadOnlyCollection<string> SelectedOf(string key) =>
+        ValueOf(key)?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
+
+    private void SetMany(string key, IReadOnlyCollection<string?>? values)
+    {
+        var keys = values?.Where(value => !string.IsNullOrEmpty(value)).ToArray() ?? [];
+        Values[key] = keys.Length == 0 ? null : string.Join(",", keys);
+    }
+}

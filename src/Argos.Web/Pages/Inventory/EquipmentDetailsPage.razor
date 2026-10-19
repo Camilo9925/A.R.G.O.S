@@ -1,0 +1,371 @@
+@page "/inventory/equipment/{Id:guid}"
+
+@attribute [Authorize(Policy = Permissions.InventoryView)]
+@inject EquipmentClient Equipment
+@inject InventoryReferenceClient Reference
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject DisplayTime DisplayTime
+
+@*
+    Detalhes do equipamento (US-04, US-05, RF-008, RF-009; plan 15.15). Necessidade de manutenção, situações permitidas
+    e características vêm prontas da API (D-54, D-59). As ações aparecem só com a permissão correspondente, e a API
+    recusa de qualquer forma. Não existe opção de exclusão (RN-23).
+*@
+<PageTitle>@(_details?.SerialNumber ?? "Equipamento") · ARGOS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudBreadcrumbs Items="Breadcrumbs" Class="px-0 pt-0" />
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" role="alert">
+            @_error
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="LoadAsync" Class="ml-2">Tentar novamente</MudButton>
+        </MudAlert>
+    }
+    else if (_details is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-hidden="true" />
+        <MudText Typo="Typo.body2" Class="mt-2" role="status">Carregando o equipamento…</MudText>
+    }
+    else
+    {
+        var details = _details;
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="mb-3">
+            <MudStack Spacing="1">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@InventoryLabels.IconFor(details.TypeIcon)" Size="Size.Large" aria-hidden="true" />
+                    <MudText Typo="Typo.h4" HtmlTag="h1">@details.SerialNumber</MudText>
+                </MudStack>
+                <MudText Typo="Typo.body1">@details.TypeName · @details.Brand @details.Model</MudText>
+                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                    <StatusBadge Status="details.Status" />
+                    <MaintenanceNeedBadge Need="details.MaintenanceNeed" />
+                </MudStack>
+            </MudStack>
+            <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                <AuthorizeView Policy="@Permissions.ResourceStatusChange">
+                    @if (details.AllowedStatusChanges.Count > 0)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapHoriz"
+                                   OnClick="ChangeStatusAsync">
+                            Alterar situação
+                        </MudButton>
+                    }
+                </AuthorizeView>
+                <AuthorizeView Policy="@Permissions.InventoryManage">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Build"
+                               OnClick="RegisterMaintenanceAsync">
+                        Registrar manutenção
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"
+                               Href="@($"inventory/equipment/{details.Id}/edit")">
+                        Editar
+                    </MudButton>
+                </AuthorizeView>
+            </MudStack>
+        </MudStack>
+
+        <MudText Typo="Typo.caption" Class="mb-3 d-block">
+            Atualizado em @DisplayTime.FormatDateTime(details.UpdatedAt ?? details.CreatedAt)
+            por @(details.UpdatedBy ?? details.CreatedBy) · situação desde @DisplayTime.FormatDateTime(details.StatusChangedAt)
+        </MudText>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="6">
+                <MudPaper Outlined="true" Class="pa-4" Style="height: 100%">
+                    <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-3">Dados do cadastro</MudText>
+                    <dl class="argos-definition">
+                        <dt>Tipo</dt>
+                        <dd><EquipmentTypeIcon IconKey="@details.TypeIcon" Name="@($"{details.TypeName} ({InventoryLabels.For(details.Category)})")" /></dd>
+                        <dt>Órgão responsável</dt>
+                        <dd>@details.OrganizationAcronym · @details.OrganizationName</dd>
+                        <dt>Bairro e região</dt>
+                        <dd>@details.NeighborhoodName · @details.RegionName</dd>
+                        @if (details.BaseName is not null)
+                        {
+                            <dt>Base operacional</dt>
+                            <dd>@details.BaseName</dd>
+                        }
+                    </dl>
+                    <MudText Typo="Typo.subtitle2" HtmlTag="h3" Class="mb-2">Características</MudText>
+                    @if (details.Attributes.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2">Nenhuma característica informada.</MudText>
+                    }
+                    else
+                    {
+                        <dl class="argos-definition">
+                            @foreach (var characteristic in details.Attributes)
+                            {
+                                <dt>@characteristic.Label</dt>
+                                <dd>@characteristic.DisplayValue</dd>
+                            }
+                        </dl>
+                    }
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudPaper Outlined="true" Class="pa-4" Style="height: 100%">
+                    <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-3">@(details.Location is null ? "Base e posição" : "Localização")</MudText>
+                    @if (details.Location is { } location)
+                    {
+                        <MudText Typo="Typo.body1">@location.Street, @location.Reference</MudText>
+                        <MudText Typo="Typo.body2" Class="mb-2">
+                            @location.NeighborhoodName · @location.City/@location.State · CEP @location.ZipCode
+                        </MudText>
+                        <LocationPicker Boundary="_municipality?.Boundary" Latitude="location.Latitude" Longitude="location.Longitude"
+                                        ReadOnly="true" Small="true" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body1">Base: @details.BaseName</MudText>
+                        <MudText Typo="Typo.body2">A posição atual de um equipamento móvel chega pela telemetria, numa próxima etapa.</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Outlined="true" Class="pa-4">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+                        <MudText Typo="Typo.h6" HtmlTag="h2">Manutenção</MudText>
+                        <MaintenanceNeedBadge Need="details.MaintenanceNeed" />
+                    </MudStack>
+                    @if (details.OpenMaintenances.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2">Nenhuma manutenção aberta.</MudText>
+                    }
+                    else
+                    {
+                        <MudSimpleTable Dense="true" Outlined="true">
+                            <thead>
+                                <tr>
+                                    <th>Tipo</th>
+                                    <th>Data prevista</th>
+                                    <th>Necessidade</th>
+                                    <th>Aberta em</th>
+                                    <th>Descrição</th>
+                                    <th><span class="mud-sr-only">Ações</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var maintenance in details.OpenMaintenances)
+                                {
+                                    <tr>
+                                        <td>@InventoryLabels.For(maintenance.Kind)</td>
+                                        <td>@(maintenance.DueDate is { } due ? DisplayTime.FormatDate(due) : "—")</td>
+                                        <td>@if (maintenance.Need is { } need) { <MaintenanceNeedBadge Need="need" /> }</td>
+                                        <td>@DisplayTime.FormatDateTime(maintenance.OpenedAt) · @maintenance.OpenedBy</td>
+                                        <td>@(maintenance.Description ?? InventoryLabels.For(maintenance.Origin))</td>
+                                        <td>
+                                            <AuthorizeView Policy="@Permissions.InventoryManage" Context="manage">
+                                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                                                           OnClick="() => CompleteMaintenanceAsync(maintenance)">
+                                                    Concluir
+                                                </MudButton>
+                                            </AuthorizeView>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Outlined="true" Class="pa-4">
+                    <MudTabs Elevation="0" ApplyEffectsToContainer="true" TabPanelsClass="pt-3">
+                        @* Condição no código, e não AuthorizeView: a aba precisa existir já na primeira renderização das abas. *@
+                        @if (_canSeeHistory)
+                        {
+                            <MudTabPanel Text="Histórico de situação">
+                                @if (_history is null)
+                                {
+                                    <MudText Typo="Typo.body2" role="status">Carregando o histórico…</MudText>
+                                }
+                                else
+                                {
+                                    <MudSimpleTable Dense="true" Outlined="true">
+                                        <thead>
+                                            <tr><th>Data e hora</th><th>De</th><th>Para</th><th>Origem</th><th>Autor</th><th>Justificativa</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var change in _history.Items)
+                                            {
+                                                <tr>
+                                                    <td>@DisplayTime.FormatDateTime(change.OccurredAt)</td>
+                                                    <td>@if (change.FromStatus is { } from) { <StatusBadge Status="from" /> } else { <span>—</span> }</td>
+                                                    <td><StatusBadge Status="change.ToStatus" /></td>
+                                                    <td>@InventoryLabels.For(change.Origin)</td>
+                                                    <td>@change.Author</td>
+                                                    <td>@(change.Justification ?? "—")</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </MudSimpleTable>
+                                    @if (_history.TotalCount > _history.Items.Count)
+                                    {
+                                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Class="mt-2"
+                                                   OnClick="LoadMoreHistoryAsync">
+                                            Carregar mais (@(_history.TotalCount - _history.Items.Count) restantes)
+                                        </MudButton>
+                                    }
+                                }
+                            </MudTabPanel>
+                        }
+                        <MudTabPanel Text="Manutenções encerradas">
+                            @if (_closedMaintenances is null)
+                            {
+                                <MudText Typo="Typo.body2" role="status">Carregando as manutenções…</MudText>
+                            }
+                            else if (_closedMaintenances.Count == 0)
+                            {
+                                <MudText Typo="Typo.body2">Nenhuma manutenção concluída ou cancelada.</MudText>
+                            }
+                            else
+                            {
+                                <MudSimpleTable Dense="true" Outlined="true">
+                                    <thead>
+                                        <tr><th>Tipo</th><th>Estado</th><th>Encerrada em</th><th>Resultado</th><th>Observações ou motivo</th><th>Autor</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var maintenance in _closedMaintenances)
+                                        {
+                                            <tr>
+                                                <td>@InventoryLabels.For(maintenance.Kind)</td>
+                                                <td>@InventoryLabels.For(maintenance.State)</td>
+                                                <td>@((maintenance.CompletedAt ?? maintenance.CancelledAt) is { } closedAt ? DisplayTime.FormatDateTime(closedAt) : "—")</td>
+                                                <td>@(maintenance.Result is { } result ? InventoryLabels.For(result) : "—")</td>
+                                                <td>@(maintenance.CompletionNotes ?? maintenance.CancellationReason ?? "—")</td>
+                                                <td>@(maintenance.CompletedBy ?? maintenance.CancelledBy)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </MudSimpleTable>
+                            }
+                        </MudTabPanel>
+                    </MudTabs>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    private const int HistoryPageSize = 10;
+
+    private EquipmentDetails? _details;
+    private MunicipalityData? _municipality;
+    private PagedResult<StatusChangeData>? _history;
+    private IReadOnlyList<MaintenanceData>? _closedMaintenances;
+    private string? _error;
+    private bool _canSeeHistory;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationState { get; set; } = null!;
+
+    private List<BreadcrumbItem> Breadcrumbs =>
+    [
+        new("Equipamentos", "inventory/equipment"),
+        new(_details?.SerialNumber ?? "Equipamento", null, disabled: true),
+    ];
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _canSeeHistory = (await AuthenticationState).User.HasClaim(AccessClaimTypes.Permission, Permissions.HistoryView);
+        try
+        {
+            var details = Equipment.GetAsync(Id);
+            var maintenances = Equipment.ListMaintenancesAsync(Id);
+            _municipality ??= await Reference.GetMunicipalityAsync();
+            _details = await details;
+            _closedMaintenances = (await maintenances).Where(maintenance => maintenance.State != MaintenanceState.Open).ToArray();
+
+            _history = _canSeeHistory ? await Equipment.ListStatusChangesAsync(Id, 1, HistoryPageSize) : null;
+        }
+        catch (ApiProblemException problem)
+        {
+            _error = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Verifique a conexão e tente novamente.";
+        }
+    }
+
+    private async Task LoadMoreHistoryAsync()
+    {
+        if (_history is null)
+        {
+            return;
+        }
+
+        var next = await Equipment.ListStatusChangesAsync(Id, _history.Page + 1, HistoryPageSize);
+        _history = next with { Items = [.. _history.Items, .. next.Items] };
+    }
+
+    private async Task ChangeStatusAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<StatusChangeDialog>(
+            "Alterar situação",
+            new DialogParameters<StatusChangeDialog>
+            {
+                { dialog => dialog.EquipmentId, Id },
+                { dialog => dialog.Current, _details!.Status },
+                { dialog => dialog.Options, _details!.AllowedStatusChanges },
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Situação alterada.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task RegisterMaintenanceAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<RegisterMaintenanceDialog>(
+            "Registrar manutenção",
+            new DialogParameters<RegisterMaintenanceDialog> { { dialog => dialog.EquipmentId, Id } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Manutenção registrada.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task CompleteMaintenanceAsync(MaintenanceData maintenance)
+    {
+        var description = $"{InventoryLabels.For(maintenance.Kind)}"
+            + (maintenance.DueDate is { } due ? $", prevista para {DisplayTime.FormatDate(due)}" : string.Empty);
+        var dialog = await Dialogs.ShowAsync<CompleteMaintenanceDialog>(
+            "Concluir manutenção",
+            new DialogParameters<CompleteMaintenanceDialog>
+            {
+                { dialog => dialog.EquipmentId, Id },
+                { dialog => dialog.MaintenanceId, maintenance.Id },
+                { dialog => dialog.Description, description },
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        if (await dialog.Result is { Canceled: false, Data: MaintenanceCompletionData completion })
+        {
+            var next = completion.NextPeriodic?.DueDate is { } nextDue
+                ? $" Próxima periódica em {DisplayTime.FormatDate(nextDue)}."
+                : string.Empty;
+            Snackbar.Add($"Manutenção concluída.{next}", Severity.Success);
+            await LoadAsync();
+        }
+    }
+}

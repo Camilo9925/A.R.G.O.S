@@ -1,0 +1,133 @@
+@inject EquipmentClient Equipment
+@inject DisplayTime DisplayTime
+@inject TimeProvider TimeProvider
+
+@*
+    Concluir manutenção (US-05): resultado, data e hora (no fuso de exibição) e observações. A nova situação (RN-11) e a
+    próxima periódica (RN-09) vêm prontas da API.
+*@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Concluir manutenção</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body2">@Description</MudText>
+            <div>
+                <MudRadioGroup T="MaintenanceResult?" @bind-Value="_result" aria-label="Resultado da manutenção">
+                    <MudRadio T="MaintenanceResult?" Value="@MaintenanceResult.Success" Color="Color.Primary">
+                        @InventoryLabels.For(MaintenanceResult.Success)
+                    </MudRadio>
+                    <MudRadio T="MaintenanceResult?" Value="@MaintenanceResult.Failure" Color="Color.Primary">
+                        @InventoryLabels.For(MaintenanceResult.Failure)
+                    </MudRadio>
+                </MudRadioGroup>
+                @if (_errors.Has("result"))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Error" role="alert">@_errors.For("result")</MudText>
+                }
+            </div>
+            <MudGrid Spacing="2">
+                <MudItem xs="7">
+                    <MudDatePicker @bind-Date="_date" Editable="true" Label="Data da conclusão" Variant="Variant.Outlined" DateFormat="dd/MM/yyyy"
+                                   Error="@_errors.Has("completedAt")" ErrorText="@_errors.For("completedAt")" />
+                </MudItem>
+                <MudItem xs="5">
+                    <MudTimePicker @bind-Time="_time" Label="Hora" Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+            <MudTextField @bind-Value="_notes" Label="Observações (opcional)" Variant="Variant.Outlined" Lines="3" MaxLength="1000"
+                          Error="@_errors.Has("notes")" ErrorText="@_errors.For("notes")" />
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true" role="alert">@_error</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="_saving">
+            @(_saving ? "Salvando…" : "Concluir")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly FieldErrors _errors = new();
+    private MaintenanceResult? _result;
+    private DateTime? _date;
+    private TimeSpan? _time;
+    private (DateTime? Date, TimeSpan? Time) _defaults;
+    private string? _notes;
+    private string? _error;
+    private bool _saving;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public Guid EquipmentId { get; set; }
+
+    [Parameter, EditorRequired]
+    public Guid MaintenanceId { get; set; }
+
+    [Parameter]
+    public string Description { get; set; } = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        var now = DisplayTime.LocalNow(TimeProvider);
+        _date = now.Date;
+        _time = new TimeSpan(now.Hour, now.Minute, 0);
+        _defaults = (_date, _time);
+    }
+
+    /// <summary>
+    /// Instante enviado: sem mudança em data e hora, o agora completo (a hora mostrada não tem segundos, e uma
+    /// manutenção aberta no mesmo minuto seria recusada como anterior à abertura); senão, a data e a hora escolhidas.
+    /// </summary>
+    private DateTimeOffset? CompletedAt() =>
+        (_date, _time) == _defaults
+            ? TimeProvider.GetUtcNow()
+            : _date is { } date ? DisplayTime.ToInstant(date.Date + (_time ?? TimeSpan.Zero)) : null;
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        _error = null;
+        _errors.Clear();
+
+        try
+        {
+            var completion = await Equipment.CompleteMaintenanceAsync(
+                EquipmentId,
+                MaintenanceId,
+                new CompleteMaintenanceRequest
+                {
+                    Result = _result,
+                    CompletedAt = CompletedAt(),
+                    Notes = _notes,
+                });
+            Dialog.Close(DialogResult.Ok(completion));
+        }
+        catch (ApiProblemException problem) when (problem.IsValidation)
+        {
+            _errors.Load(problem.Errors);
+            _error = _errors.Except(["result", "completedAt", "notes"]).FirstOrDefault();
+        }
+        catch (ApiProblemException problem)
+        {
+            _error = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Tente novamente.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

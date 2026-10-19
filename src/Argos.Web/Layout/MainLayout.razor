@@ -22,6 +22,13 @@
                 <img src="images/brand/argos-symbol-128.png" alt="" aria-hidden="true" width="36" height="36" class="argos-brand-symbol" />
                 <MudText Typo="Typo.h6" Class="argos-brand-name">ARGOS</MudText>
                 <MudSpacer />
+                @* Todo o ambiente de demonstração é simulado (Art. IX.2; plan 15.11.4). *@
+                <MudTooltip Text="Os dados exibidos são gerados pela simulação.">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Secondary"
+                             Icon="@Icons.Material.Filled.Science" Class="mr-3">
+                        Dados simulados
+                    </MudChip>
+                </MudTooltip>
                 <ConnectionIndicator />
                 <UserMenu />
                 <MudTooltip Text="@ThemeToggleLabel">
@@ -38,8 +45,14 @@
                     <AuthorizeView Policy="@Permissions.OperationsView">
                         <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Radar">Central</MudNavLink>
                     </AuthorizeView>
+                    @* Grupo do Inventário (D-67): Equipamentos para quem consulta, Cadastros de apoio para quem cadastra. *@
                     <AuthorizeView Policy="@Permissions.InventoryView">
-                        <MudNavLink Href="inventory" Icon="@Icons.Material.Filled.Inventory2">Inventário</MudNavLink>
+                        <MudNavGroup Title="Inventário" Icon="@Icons.Material.Filled.Inventory2" Expanded="true">
+                            <MudNavLink Href="inventory/equipment" Icon="@Icons.Material.Filled.Devices">Equipamentos</MudNavLink>
+                            <AuthorizeView Policy="@Permissions.InventoryManage" Context="manage">
+                                <MudNavLink Href="inventory/settings" Icon="@Icons.Material.Filled.Tune">Cadastros de apoio</MudNavLink>
+                            </AuthorizeView>
+                        </MudNavGroup>
                     </AuthorizeView>
                     <AuthorizeView Policy="@Permissions.PredictiveView">
                         <MudNavLink Href="predictive" Icon="@Icons.Material.Filled.Insights">Preditiva</MudNavLink>

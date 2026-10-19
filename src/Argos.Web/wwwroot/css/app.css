@@ -120,6 +120,31 @@ h1:focus {
   color: var(--mud-palette-primary);
 }
 
+/* Marcador do seletor de ponto: gota no ciano de seleção (Art. XI.1), com contorno para os dois temas. */
+.argos-pin span {
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin: 0 2px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: #00C2FF;
+  border: 2px solid #0B1E3F;
+  box-shadow: 0 0 0 2px #E8EEF5;
+}
+
+.argos-picker {
+  /* Altura fixa também dentro de um contêiner flex, como o MudStack dos diálogos. */
+  flex: none;
+  height: 22rem;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.argos-picker--small {
+  height: 14rem;
+}
+
 .argos-map-notice {
   max-width: 18rem;
   padding: 0.5rem 0.75rem;
@@ -169,4 +194,69 @@ h1:focus {
   display: flex;
   flex-direction: column;
   line-height: 1.2;
+}
+
+/* Selos de situação e de necessidade (Art. X.2, XI.2): cor no contorno e no ícone, texto na cor do tema (contraste AA). */
+.argos-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.55rem 0.1rem 0.35rem;
+  border: 1px solid var(--argos-badge-color);
+  border-left-width: 4px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: var(--mud-palette-text-primary);
+}
+
+.argos-badge--outlined {
+  border-style: dashed;
+}
+
+.argos-badge .argos-badge-icon {
+  color: var(--argos-badge-color);
+}
+
+.argos-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.argos-active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.argos-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.argos-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+}
+
+.argos-definition dt {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.argos-definition dd {
+  margin: 0 0 0.75rem 0;
+}
+
+/* Cabeçalho ordenável da tabela com a mesma tipografia dos demais (sem caixa alta do botão). */
+.argos-sort {
+  text-transform: none;
+  font-weight: 600;
+  padding-left: 0;
 }

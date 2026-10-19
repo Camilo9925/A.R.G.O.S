@@ -93,7 +93,9 @@ public sealed class EquipmentController(
 
     /// <summary>
     /// Histórico de situação, do mais recente para o mais antigo (RF-008), paginado por <c>page</c> e <c>pageSize</c>;
-    /// a ordem é fixa, e <c>sort</c> e <c>direction</c> não se aplicam.
+    /// a ordem é fixa, e <c>sort</c> e <c>direction</c> não se aplicam. O parâmetro não se chama <c>page</c>: com esse
+    /// nome, o binding tomaria a chave <c>page</c> da query como prefixo do objeto e ignoraria <c>page</c> e
+    /// <c>pageSize</c>.
     /// </summary>
     [HttpGet("{id:guid}/status-changes")]
     [Authorize(Policy = Permissions.HistoryView)]
@@ -101,6 +103,6 @@ public sealed class EquipmentController(
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
     public async Task<ActionResult<PagedResult<StatusChangeData>>> ListStatusChanges(
-        Guid id, [FromQuery] PageQuery page, CancellationToken cancellationToken) =>
-        Ok(await queries.ListStatusChangesAsync(id, page, cancellationToken));
+        Guid id, [FromQuery] PageQuery paging, CancellationToken cancellationToken) =>
+        Ok(await queries.ListStatusChangesAsync(id, paging, cancellationToken));
 }

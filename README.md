@@ -8,9 +8,9 @@ O ARGOS é uma plataforma de gestão de equipamentos e operações de segurança
 2. **Central de Operações:** o que está acontecendo agora?
 3. **Cidade Preditiva:** o que pode acontecer amanhã?
 
-> **Estado atual: Fase 1 — Acesso.** O esqueleto da Fase 0 atravessa todas as camadas e contêineres: o simulador envia um sinal de vida técnico à API, a API o repassa em tempo real (SignalR) à Web, e a Web mostra a casca do ARGOS com o mapa e o estado da conexão. A Fase 1 colocou login, perfis (Administrador, Operador e Gestor) e autorização em tudo: a Central só abre com login, cada perfil vê o menu da sua função, a API e o hub exigem autenticação, e o simulador se autentica com uma chave de sistema. Inventário, telemetria e previsões vêm nas próximas fases.
+> **Estado atual: Fase 2 — Inventário (cadastros de apoio e equipamentos).** O esqueleto da Fase 0 atravessa todas as camadas e contêineres, e a Fase 1 colocou login, perfis (Administrador, Operador e Gestor) e autorização em tudo. A Fase 2 entrega a primeira metade do Inventário Inteligente: a carga de Prometeia com **300 equipamentos**, a pesquisa e os filtros, o cadastro e a edição de equipamentos com sugestão de endereço por CEP e escolha do ponto no mapa, a situação de cada equipamento e as manutenções, e os cadastros de apoio (órgãos, regiões, bairros e bases). Agentes, linha do tempo, inativação e tipos personalizados vêm na Fase 3; telemetria, Central e previsões, nas seguintes.
 
-> **Dados simulados e fictícios.** Na ausência de dispositivos reais, o ARGOS opera com dados **simulados**. Prometeia/SP e todos os nomes, ruas, bairros, CEPs, pessoas, matrículas e placas são **fictícios**. A geometria das ruas vem da malha viária de uma cidade real do interior paulista (OpenStreetMap), exibida sem nenhum nome.
+> **Dados simulados e fictícios.** Na ausência de dispositivos reais, o ARGOS opera com dados **simulados**, e a Web mostra no cabeçalho, o tempo todo, o selo **"Dados simulados"**. Prometeia/SP e todos os nomes, ruas, bairros, CEPs, marcas, números de série, pessoas, matrículas e placas são **fictícios**. A geometria das ruas vem da malha viária de uma cidade real do interior paulista (OpenStreetMap), exibida sem nenhum nome real.
 
 ## Pré-requisitos
 
@@ -28,7 +28,7 @@ docker compose up --build
 
 O `.env` traz valores fictícios, prontos para uso local, incluindo as chaves de acesso e os três usuários de demonstração (veja [Variáveis do `.env`](#variáveis-do-env)). **Antes de mostrar o ambiente a alguém, troque as senhas e as chaves** por valores seus: o `.env.example` é público, então os valores dele não são segredo. Se a porta 5432 já estiver ocupada na sua máquina, troque `POSTGRES_HOST_PORT` no `.env`.
 
-Os serviços sobem nesta ordem: `db` → `migrator` (aplica as migrations, cria ou atualiza os usuários de demonstração e termina) → `api` → `simulator` e `web`. A subida termina quando `docker compose ps` mostra os serviços como `healthy` e o `migrator` como `Exited (0)`.
+Os serviços sobem nesta ordem: `db` → `migrator` (aplica as migrations, cria ou atualiza os usuários de demonstração, carrega os parâmetros de negócio e o Inventário de Prometeia e termina; veja [Carga inicial](#carga-inicial-e-versões-do-seed)) → `api` → `simulator` e `web`. A subida termina quando `docker compose ps` mostra os serviços como `healthy` e o `migrator` como `Exited (0)`. A primeira subida compila as imagens e leva alguns minutos; a carga em si leva poucos segundos.
 
 Para rodar em segundo plano, use `docker compose up --build -d`; os logs (em JSON) ficam em `docker compose logs -f <serviço>`.
 
@@ -40,13 +40,94 @@ O ambiente do Compose é o **ambiente de demonstração**: a tela de login mostr
 
 | Perfil | Login | O que vê no menu |
 |---|---|---|
-| Administrador | `admin` | Central, Inventário e Preditiva |
+| Administrador | `admin` | Central; Inventário (Equipamentos e Cadastros de apoio); Preditiva |
 | Operador | `operador` | Central |
-| Gestor | `gestor` | Central, Inventário e Preditiva |
+| Gestor | `gestor` | Central; Inventário (Equipamentos, só consulta); Preditiva |
 
-As senhas são as do seu `.env` (`DEMO_*_PASSWORD`). O cabeçalho mostra o nome e o perfil de quem entrou, e **Sair** volta à tela de login. Uma página fora do perfil (por exemplo, o Operador em `/inventory`) mostra "Acesso negado". A sessão dura 8 horas e termina ao fechar a aba do navegador; ao vencer, o ARGOS volta ao login com "Sua sessão expirou.".
+As senhas são as do seu `.env` (`DEMO_*_PASSWORD`). O cabeçalho mostra o nome e o perfil de quem entrou, e **Sair** volta à tela de login. Uma página fora do perfil (por exemplo, o Operador em `/inventory/equipment`) mostra "Acesso negado". A sessão dura 8 horas e termina ao fechar a aba do navegador; ao vencer, o ARGOS volta ao login com "Sua sessão expirou.".
 
-O preenchimento rápido existe **só no ambiente de demonstração**: fora dele (imagem da Web sem `ARGOS_ENVIRONMENT=Demo`, ou `dotnet run`), a tela mostra só o formulário, e nenhuma credencial é exibida. Inventário e Preditiva ainda mostram "Em construção".
+O preenchimento rápido existe **só no ambiente de demonstração**: fora dele (imagem da Web sem `ARGOS_ENVIRONMENT=Demo`, ou `dotnet run`), a tela mostra só o formulário, e nenhuma credencial é exibida. A Preditiva ainda mostra "Em construção", e a Central mostra só o mapa e o estado da conexão.
+
+## Inventário
+
+O menu **Inventário → Equipamentos** abre a lista dos equipamentos de Prometeia. O Administrador consulta e altera; o Gestor só consulta (os botões de escrita não aparecem, e a API recusa a escrita com `403`); o Operador não vê o Inventário.
+
+### O que a carga traz
+
+| O quê | Quantidade |
+|---|---|
+| Município | Prometeia/SP, com o contorno desenhado no mapa |
+| Regiões | 5 (Centro, Zona Norte, Zona Sul, Zona Leste e Zona Oeste) |
+| Bairros | 30, todos com nomes inventados |
+| CEPs | 597, um por logradouro em cada bairro, todos começando por `16985` |
+| Órgãos | 5: Secretaria Municipal de Mobilidade (SMM), Guarda Civil Municipal (GCM), Polícia Militar (PM) e duas concessionárias fictícias (ROTAPRO e ÁGORA) |
+| Bases operacionais | 9 |
+| Tipos de equipamento | 10 (radar, câmera, balança, cancela, totem, veículo autônomo, veículo de transporte, patinete, moto de agente de trânsito e viatura), cada um com as suas características |
+| Equipamentos | **300**: 200 fixos (com endereço) e 100 móveis (com base operacional), a maioria operacional e alguns em mau funcionamento, em manutenção, ainda não instalados, desativados ou furtados, com manutenções vencidas e próximas |
+
+Com a semente padrão (`SIMULATION_SEED=42`), os dados são sempre os mesmos. As datas da carga (cadastro há cerca de seis meses, mudanças de situação nos últimos dias, datas de manutenção) são contadas a partir do dia em que a carga roda. Tudo o que a carga grava tem o autor `simulação`.
+
+### Pesquisar e filtrar
+
+- **Pesquisa:** número de série, marca, modelo, rua ou bairro, sem diferença de acentos e de maiúsculas. Por exemplo, `crepusculo` encontra os equipamentos da Vila Crepúsculo e `bussola`, os da Avenida da Bússola.
+- **Filtros:** tipo, situação, órgão, região, bairro, necessidade de manutenção e fixo ou móvel. Vários valores no mesmo filtro somam ("Câmera" ou "Radar"); filtros diferentes se combinam ("Câmera" **e** "Mau funcionamento" **e** "Centro"). Os filtros ativos aparecem numa barra, com **Limpar filtros**.
+- A pesquisa, os filtros e a página ficam no endereço do navegador: dá para voltar à mesma lista ou compartilhar o link.
+
+### Cadastrar um equipamento
+
+Entre como **Administrador** e abra **Inventário → Equipamentos → Novo equipamento**. Para cadastrar uma câmera:
+
+1. **Identificação:** tipo **Câmera de videomonitoramento**, órgão (por exemplo, **GCM · Guarda Civil Municipal**), número de série, marca e modelo (qualquer texto; marca e número de série não podem repetir os de outro equipamento).
+2. **Características:** aparecem conforme o tipo. Para a câmera: **Resolução**, **Visão noturna**, **Modo de cor** e **Giro e zoom (PTZ)**; o **Campo de visão** é opcional.
+3. **Localização:** digite o CEP **16985-001** e saia do campo; o ARGOS sugere a rua (Avenida dos Sabiás), o bairro (Jardim Poente) e a região e centraliza o mapa. Cidade e UF são sempre Prometeia/SP. Preencha a **referência** (texto livre, como "número 181", "oposto ao número 181" ou "S/N") e clique no mapa, dentro do contorno tracejado, para marcar o ponto exato (ou digite a latitude e a longitude).
+4. **Situação e manutenção inicial:** a situação inicial já vem como Operacional (as opções são Ainda não instalado, Operacional, Mau funcionamento e Em manutenção). Se quiser, registre uma manutenção já no cadastro.
+5. Clique em **Cadastrar equipamento**. O ARGOS abre os detalhes do equipamento, com o registro inicial no histórico de situação.
+
+Se algo estiver errado, a mensagem aparece no próprio campo (campo obrigatório vazio, ponto fora do município, característica obrigatória do tipo, como a velocidade máxima de um radar na modalidade Velocidade). Se a marca e o número de série já existirem, o aviso traz o link **Abrir equipamento existente**. Equipamentos móveis (viaturas, motos, patinetes etc.) não têm endereço: escolha a **base operacional**.
+
+### Situação e manutenção
+
+Nos detalhes do equipamento:
+
+- **Alterar situação** mostra só as situações permitidas a partir da atual. Furtado e Desativado pedem justificativa. Passar para Mau funcionamento abre uma manutenção imediata; passar para Desativado ou Furtado cancela as manutenções abertas.
+- **Reativar** um equipamento desativado (Desativado → Operacional) é **só do Administrador**, com justificativa. O Operador tem a permissão de mudar situações, mas a API recusa a reativação feita por ele com `403` e o motivo.
+- **Registrar manutenção:** imediata, agendada (com data prevista) ou periódica (com data prevista e periodicidade em dias). As abertas mostram o selo **Próxima** (até 7 dias) ou **Vencida**.
+- **Concluir** registra a data, o resultado e as observações. Com sucesso, o equipamento volta a Operacional; sem sucesso, passa para (ou continua em) Mau funcionamento, e uma nova manutenção imediata é aberta se não houver outra. A conclusão não muda a situação de um equipamento Ainda não instalado. Concluir uma periódica programa a próxima automaticamente.
+- O **histórico de situação** e as manutenções encerradas ficam nos detalhes, com data, hora e autor.
+
+Nada no Inventário é excluído: não existe opção de exclusão em nenhuma tela nem rota `DELETE` na API. A inativação de cadastros chega na Fase 3.
+
+### Cadastros de apoio
+
+**Inventário → Cadastros de apoio** (só o Administrador) tem as abas Órgãos, Regiões, Bairros (com o centro escolhido no mapa) e Bases (com localização e sugestão por CEP), cada uma com criação, edição, inativação e o filtro **Mostrar inativos**. A inativação é recusada, com o motivo, quando ainda há algo ativo ligado ao cadastro (por exemplo, um bairro com equipamentos).
+
+## Carga inicial e versões do seed
+
+A cada subida, o `migrator` aplica as migrations e a carga inicial, sem duplicar nada. Cada parte da carga é uma **versão do seed**, gravada no banco junto com a semente usada, na mesma transação dos dados:
+
+| Versão | O que carrega |
+|---|---|
+| `foundation` | Só o registro de fundação do ambiente, sem dados |
+| `inventory-reference-v1` | Município, regiões, bairros, CEPs, órgãos, bases e os 10 tipos |
+| `inventory-catalog-v1` | Os 300 equipamentos, com situações e manutenções |
+
+Na primeira subida, o log do `migrator` mostra `Carga inventory-reference-v1 aplicada com a semente 42: ...` e `Carga inventory-catalog-v1 aplicada com a semente 42: ...`, com as quantidades. Nas seguintes, mostra `... já aplicada; nada a fazer.` e não grava nada no Inventário. Se uma carga falhar no meio, nada dela fica gravado, e a próxima subida tenta de novo.
+
+Para ver o log: `docker compose logs migrator`.
+
+**Trocar a semente:** se o banco já tem uma carga feita com outra semente, o `migrator` para com a mensagem `A carga ... já foi aplicada com a semente 42. Para usar a semente 7, recomece o banco (docker compose down -v).` Para usar outra semente, [recomece do zero](#recomeçar-do-zero) com a nova `SIMULATION_SEED` no `.env`.
+
+### Parâmetros de negócio (`BusinessParameters`)
+
+Os parâmetros de negócio ajustáveis pelo Administrador ficam no banco. Nesta fase existe um: `maintenance.upcoming-window-days`, quantos dias antes da data prevista uma manutenção passa a ser **Próxima** (padrão 7, de 1 a 60). O valor inicial vem da seção `BusinessParameters` de `src/Argos.Migrator/appsettings.json`:
+
+```json
+"BusinessParameters": {
+  "maintenance.upcoming-window-days": 7
+}
+```
+
+O `migrator` só cria os parâmetros que ainda não existem no banco e **nunca sobrescreve um valor já gravado**. Assim, mudar o arquivo vale para um banco novo: altere o valor e rode `docker compose down -v` e `docker compose up --build` (o `--build` leva o arquivo novo para a imagem do `migrator`). Uma chave desconhecida ou um valor fora da faixa faz o `migrator` terminar com código 1 e a mensagem da chave no log, sem subir a API. A tela para o Administrador editar os parâmetros chega numa fase seguinte.
 
 ## Variáveis do `.env`
 
@@ -127,7 +208,7 @@ Em <http://localhost:8081/scalar> (só no ambiente de demonstração):
 dotnet test
 ```
 
-Roda os testes unitários e os de integração, incluindo login, `401`/`403`, a matriz de permissões por perfil e o recorte do tempo real por perfil. Os testes usam chaves e usuários próprios, sem o `.env`. Os testes de integração sobem um PostgreSQL 17 descartável com o Testcontainers, então **o Docker precisa estar em execução**. Para rodar um projeto só:
+Roda os testes unitários e os de integração, incluindo login, `401`/`403`, a matriz de permissões por perfil, o recorte do tempo real por perfil, as regras do Inventário e todos os endpoints do Inventário. Os testes usam chaves, usuários e dados próprios, sem o `.env` e sem a carga de Prometeia. Os testes de integração sobem um PostgreSQL 17 descartável com o Testcontainers, então **o Docker precisa estar em execução**. Para rodar um projeto só:
 
 ```bash
 dotnet test --project src/tests/Argos.UnitTests
@@ -140,7 +221,7 @@ dotnet test --project src/tests/Argos.IntegrationTests
 docker compose down -v
 ```
 
-Remove os contêineres, a rede e o volume do banco (`argos-pgdata`). O próximo `docker compose up --build` recria tudo, incluindo as migrations e a carga inicial.
+Remove os contêineres, a rede e o volume do banco (`argos-pgdata`), **com tudo o que foi cadastrado ou alterado pela interface**. O próximo `docker compose up --build` recria tudo, incluindo as migrations e a carga inicial de Prometeia. É o caminho para trocar a semente (`SIMULATION_SEED`) ou o valor inicial de um parâmetro de negócio.
 
 ## Desenvolvimento sem Docker (opcional)
 

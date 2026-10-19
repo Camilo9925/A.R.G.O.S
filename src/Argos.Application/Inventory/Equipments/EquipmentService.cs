@@ -40,6 +40,15 @@ public sealed class EquipmentService(
     private const string InitialMaintenanceField = "initialMaintenance";
 
     /// <summary>
+    /// Situações aceitas no cadastro, na ordem do Domínio (D-66), para o formulário listar só essas sem repetir a regra
+    /// (D-59).
+    /// </summary>
+    public static IReadOnlyList<Contracts.Inventory.EquipmentStatus> InitialStatuses() =>
+        EquipmentStatusTransitions.InitialStatuses
+            .Select(status => EnumNames.Convert<Contracts.Inventory.EquipmentStatus>(status))
+            .ToArray();
+
+    /// <summary>
     /// Cadastra o equipamento com o registro inicial de situação (US-01) e, se informada, a manutenção inicial (RF-002).
     /// Não gera registro cadastral de criação: o registro inicial de situação já o representa (plan 15.2.11).
     /// </summary>

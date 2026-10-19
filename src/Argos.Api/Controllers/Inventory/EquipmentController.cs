@@ -44,6 +44,12 @@ public sealed class EquipmentController(
     public async Task<ActionResult<EquipmentDetails>> Get(Guid id, CancellationToken cancellationToken) =>
         Ok(await queries.GetDetailsAsync(id, cancellationToken));
 
+    /// <summary>Situações aceitas no cadastro (D-66), para o formulário listar só essas (D-59).</summary>
+    [HttpGet("initial-statuses")]
+    [Authorize(Policy = Permissions.InventoryManage)]
+    [ProducesResponseType<IReadOnlyList<EquipmentStatus>>(StatusCodes.Status200OK)]
+    public ActionResult<IReadOnlyList<EquipmentStatus>> ListInitialStatuses() => Ok(EquipmentService.InitialStatuses());
+
     /// <summary>
     /// Cadastro (US-01, US-02). Marca e número de série repetidos: 409 com <c>existingEquipmentId</c> (RN-01).
     /// </summary>

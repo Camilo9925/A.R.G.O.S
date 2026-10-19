@@ -30,6 +30,10 @@ public sealed class EquipmentClient(HttpClient http) : ApiClient(http)
     public Task<EquipmentDetails> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
         GetAsync<EquipmentDetails>($"{Base}/{id}", cancellationToken);
 
+    /// <summary>Situações aceitas no cadastro (D-66), que o formulário lista sem repetir a regra (D-59).</summary>
+    public Task<IReadOnlyList<EquipmentStatus>> ListInitialStatusesAsync(CancellationToken cancellationToken = default) =>
+        GetAsync<IReadOnlyList<EquipmentStatus>>($"{Base}/initial-statuses", cancellationToken);
+
     public Task<EquipmentDetails> CreateAsync(CreateEquipmentRequest request, CancellationToken cancellationToken = default) =>
         SendAsync<EquipmentDetails>(HttpMethod.Post, Base, request, cancellationToken);
 

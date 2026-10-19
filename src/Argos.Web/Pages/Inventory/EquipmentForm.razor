@@ -139,7 +139,7 @@
                         <MudItem xs="12" sm="6">
                             <MudSelect T="EquipmentStatus?" @bind-Value="_create.Status" Label="Situação inicial" Variant="Variant.Outlined"
                                        Required="true" Error="@_errors.Has("status")" ErrorText="@_errors.For("status")">
-                                @foreach (var (status, _) in StatusTokens.All)
+                                @foreach (var status in _initialStatuses)
                                 {
                                     <MudSelectItem T="EquipmentStatus?" Value="@status"><StatusBadge Status="status" /></MudSelectItem>
                                 }
@@ -181,6 +181,7 @@
     private readonly RegisterMaintenanceRequest _initialMaintenance = new();
     private UpdateEquipmentRequest _update = new();
     private IReadOnlyList<EquipmentTypeData> _types = [];
+    private IReadOnlyList<EquipmentStatus> _initialStatuses = [];
     private List<OrganizationData> _organizations = [];
     private List<OperationalBaseData> _bases = [];
     private IReadOnlyList<NeighborhoodData> _neighborhoods = [];
@@ -222,11 +223,13 @@
             var bases = Reference.ListOperationalBasesAsync();
             var neighborhoods = Reference.ListNeighborhoodsAsync();
             var municipality = Reference.GetMunicipalityAsync();
+            var initialStatuses = IsEdit ? null : Equipment.ListInitialStatusesAsync();
             _types = await types;
             _organizations = [.. await organizations];
             _bases = [.. await bases];
             _neighborhoods = await neighborhoods;
             _municipality = await municipality;
+            _initialStatuses = initialStatuses is null ? [] : await initialStatuses;
 
             if (Id is { } id)
             {

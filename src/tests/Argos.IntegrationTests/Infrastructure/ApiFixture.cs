@@ -56,8 +56,18 @@ public sealed class ApiFixture : IAsyncLifetime
         await scope.ServiceProvider.GetRequiredService<IDatabaseMigrator>().MigrateAsync();
     }
 
+    /// <summary>
+    /// Outra instância da API sobre o mesmo banco, com os próprios singletons. Serve aos testes que gravam parâmetros de
+    /// negócio, cujo cache em memória é singleton (plan 15.10) e vazaria para os demais testes da instância comum.
+    /// Quem cria descarta.
+    /// </summary>
+    public WebApplicationFactory<Program> CreateIsolatedFactory() => Factory.WithWebHostBuilder(_ => { });
+
+    /// <summary>Conexão com o banco do teste, para verificações direto no PostgreSQL.</summary>
+    public string ConnectionString => _database.GetConnectionString();
+
     /// <summary>Esvazia todas as tabelas, menos o histórico de migrations, antes de cada teste.</summary>
-    public Task ResetDatabaseAsync() => DatabaseCleaner.ResetAsync(_database.GetConnectionString());
+    public Task ResetDatabaseAsync() => DatabaseCleaner.ResetAsync(ConnectionString);
 
     /// <summary>Cliente HTTP de um usuário: <c>Authorization: Bearer</c> com o token informado.</summary>
     public HttpClient CreateUserClient(string accessToken)

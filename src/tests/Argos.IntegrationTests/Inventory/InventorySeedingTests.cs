@@ -1,25 +1,29 @@
 using Argos.Application.Common.Abstractions;
 using Argos.Application.Common.Exceptions;
 using Argos.Application.Inventory;
+using Argos.Application.Seeding;
 using Argos.Application.Seeding.Inventory;
 using Argos.Contracts.Common;
 using Argos.Contracts.Inventory;
 using Argos.IntegrationTests.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using EquipmentStatus = Argos.Domain.Inventory.Equipments.EquipmentStatus;
 using EquipmentTypeCatalog = Argos.Domain.Inventory.Types.EquipmentTypeCatalog;
 
 namespace Argos.IntegrationTests.Inventory;
 
 /// <summary>
-/// Carga do Inventário contra o PostgreSQL real (T065; D-56; plan 15.11.4): cada versão é gravada na mesma transação do
-/// seu registro no histórico do seed, então uma falha no meio da gravação não deixa linhas nem registro, e a carga pode
-/// ser repetida depois. A falha é forçada pelo banco (índice único), no meio do <c>SaveChanges</c>, depois de linhas
-/// válidas já enviadas.
+/// Carga do Inventário contra o PostgreSQL real (T065, T076; D-55, D-56; plan 15.10, 15.11.4): cada versão é gravada na
+/// mesma transação do seu registro no histórico do seed, então uma falha no meio da gravação não deixa linhas nem
+/// registro, e a carga pode ser repetida depois; repetida com a mesma semente, não grava nada; com outra semente, para
+/// sem gravar. A falha é forçada pelo banco (índice único), no meio do <c>SaveChanges</c>, depois de linhas válidas já
+/// enviadas. Os parâmetros de negócio só ganham as chaves que faltam, sem sobrescrever um valor gravado.
 /// </summary>
 public sealed class InventorySeedingTests(ApiFixture fixture) : IntegrationTestBase(fixture)
 {
     private const int Seed = 42;
+    private const string WindowKey = "maintenance.upcoming-window-days";
 
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
@@ -29,7 +33,7 @@ public sealed class InventorySeedingTests(ApiFixture fixture) : IntegrationTestB
         // "Centro" e "CENTRO" têm a mesma chave normalizada: o índice único de bairros recusa o segundo na gravação.
         var reference = InventorySeedData.Reference(
         [
-            new NeighborhoodSeed(InventorySeedData.Saint, "Zona Única", new SeedPoint(-22.24, -49.64)),
+            new NeighborhoodSeed(InventorySeedData.Hesperia, "Zona Única", new SeedPoint(-22.24, -49.64)),
             new NeighborhoodSeed(InventorySeedData.Downtown, "Zona Única", new SeedPoint(-22.26, -49.66)),
             new NeighborhoodSeed("CENTRO", "Zona Única", new SeedPoint(-22.27, -49.67)),
         ]);
@@ -79,6 +83,119 @@ public sealed class InventorySeedingTests(ApiFixture fixture) : IntegrationTestB
         Assert.Equal(Seed, await FindAppliedSeedAsync(InventorySeed.CatalogVersion));
     }
 
+    [Fact]
+    public async Task LoadRunTwiceWithTheSameSeed_WritesOnlyOnce_D56()
+    {
+        var catalog = SmallCatalog();
+        var reference = await SeedReferenceAsync(InventorySeedData.Reference());
+        var loaded = await SeedCatalogAsync(catalog);
+        Assert.False(reference.AlreadyApplied);
+        Assert.False(loaded.AlreadyApplied);
+        var before = await DatabaseFingerprint.TakeAsync(Fixture.ConnectionString, Cancellation);
+        Assert.Equal(3, before["equipment"].Rows);
+        Assert.Equal(2, before["seed_history"].Rows);
+
+        var referenceAgain = await SeedReferenceAsync(InventorySeedData.Reference());
+        var catalogAgain = await SeedCatalogAsync(catalog);
+
+        Assert.True(referenceAgain.AlreadyApplied);
+        Assert.True(catalogAgain.AlreadyApplied);
+        Assert.Equal(before, await DatabaseFingerprint.TakeAsync(Fixture.ConnectionString, Cancellation));
+    }
+
+    [Fact]
+    public async Task VersionAppliedWithAnotherSeed_StopsWithDownVGuidance_WithoutWriting_D56()
+    {
+        await SeedReferenceAsync(InventorySeedData.Reference());
+        await SeedCatalogAsync(SmallCatalog());
+        var before = await DatabaseFingerprint.TakeAsync(Fixture.ConnectionString, Cancellation);
+
+        var reference = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => SeedReferenceAsync(InventorySeedData.Reference(), seed: 7));
+        var catalog = await Assert.ThrowsAsync<InvalidOperationException>(() => SeedCatalogAsync(SmallCatalog(), seed: 7));
+
+        Assert.Equal(
+            $"A carga {InventorySeed.ReferenceVersion} já foi aplicada com a semente 42. Para usar a semente 7, "
+            + "recomece o banco (docker compose down -v).",
+            reference.Message);
+        Assert.Contains(InventorySeed.CatalogVersion, catalog.Message);
+        Assert.Equal(before, await DatabaseFingerprint.TakeAsync(Fixture.ConnectionString, Cancellation));
+    }
+
+    [Fact]
+    public async Task Parameters_CreateOnlyTheMissingKeys_WithTheConfiguredValue_RN34()
+    {
+        var created = await ProvisionAsync(new Dictionary<string, int> { [WindowKey] = 10 });
+
+        Assert.Equal([WindowKey], created);
+        Assert.Equal(10m, await StoredWindowAsync());
+    }
+
+    [Fact]
+    public async Task Parameters_WithoutConfiguration_UseTheSpecDefault_RN34()
+    {
+        await ProvisionAsync(null);
+
+        Assert.Equal(7m, await StoredWindowAsync());
+    }
+
+    [Fact]
+    public async Task Parameters_NeverOverwriteAStoredValue_EvenWithAnotherConfiguredValue_RN34()
+    {
+        await ProvisionAsync(new Dictionary<string, int> { [WindowKey] = 10 });
+
+        // Valor alterado pelo Administrador; a tela de edição (RF-021) chega na rodada da Central (D-55).
+        await using (var connection = new NpgsqlConnection(Fixture.ConnectionString))
+        {
+            await connection.OpenAsync(Cancellation);
+            await using var update = new NpgsqlCommand("UPDATE business_parameters SET value = 12 WHERE key = @key", connection);
+            update.Parameters.AddWithValue("key", WindowKey);
+            Assert.Equal(1, await update.ExecuteNonQueryAsync(Cancellation));
+        }
+
+        var created = await ProvisionAsync(new Dictionary<string, int> { [WindowKey] = 5 });
+
+        Assert.Empty(created);
+        Assert.Equal(12m, await StoredWindowAsync());
+    }
+
+    [Fact]
+    public async Task Parameters_UnknownKeyOrOutOfRange_AreRefusedOnTheKey_WithoutWriting_RN34()
+    {
+        var error = await Assert.ThrowsAsync<ValidationFailedException>(() => ProvisionAsync(
+            new Dictionary<string, int> { [WindowKey] = 61, ["maintenance.unknown"] = 1 }));
+
+        Assert.Equal(
+            ["BusinessParameters:maintenance.unknown", $"BusinessParameters:{WindowKey}"],
+            error.Errors.Keys.Order());
+        Assert.Null(await StoredWindowAsync());
+    }
+
+    private static EquipmentCatalogSeed SmallCatalog() =>
+        new(
+        [
+            Camera("SEED-001", EquipmentStatus.Operational, new PeriodicMaintenanceSeed(-3, 30, "Revisão mensal")),
+            Camera("SEED-002", EquipmentStatus.Malfunction, null),
+            Camera("SEED-003", EquipmentStatus.Operational, null, new StatusChangeSeed(EquipmentStatus.Stolen, TimeSpan.FromDays(2), "Furto registrado")),
+        ]);
+
+    private async Task<IReadOnlyList<string>> ProvisionAsync(IReadOnlyDictionary<string, int>? configured)
+    {
+        await using var scope = Fixture.Factory.Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<BusinessParameterProvisioningService>()
+            .ProvisionAsync(configured, Cancellation);
+    }
+
+    /// <summary>Lido direto no banco: o cache em memória dos parâmetros é da API e não entra nesta verificação.</summary>
+    private async Task<decimal?> StoredWindowAsync()
+    {
+        await using var connection = new NpgsqlConnection(Fixture.ConnectionString);
+        await connection.OpenAsync(Cancellation);
+        await using var query = new NpgsqlCommand("SELECT value FROM business_parameters WHERE key = @key", connection);
+        query.Parameters.AddWithValue("key", WindowKey);
+        return await query.ExecuteScalarAsync(Cancellation) as decimal?;
+    }
+
     private static EquipmentSeed Camera(
         string serialNumber,
         EquipmentStatus status,
@@ -90,7 +207,7 @@ public sealed class InventorySeedingTests(ApiFixture fixture) : IntegrationTestB
             "Ômega Vision",
             "OV-200",
             InventorySeedData.Organization,
-            new LocationSeed("16985001", "Rua das Flores", InventorySeedData.Saint, "número 181", -22.241, -49.641),
+            new LocationSeed("16985001", "Rua das Flores", InventorySeedData.Hesperia, "número 181", -22.241, -49.641),
             null,
             new Dictionary<string, object?>
             {
@@ -104,18 +221,18 @@ public sealed class InventorySeedingTests(ApiFixture fixture) : IntegrationTestB
             periodic,
             change);
 
-    private async Task<SeedResult> SeedReferenceAsync(InventoryReferenceSeed reference)
+    private async Task<SeedResult> SeedReferenceAsync(InventoryReferenceSeed reference, int seed = Seed)
     {
         await using var scope = Fixture.Factory.Services.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<InventoryReferenceSeeder>()
-            .SeedAsync(reference, Seed, InventorySeedData.Anchor.AddDays(-200), Cancellation);
+            .SeedAsync(reference, seed, InventorySeedData.Anchor.AddDays(-200), Cancellation);
     }
 
-    private async Task<SeedResult> SeedCatalogAsync(EquipmentCatalogSeed catalog)
+    private async Task<SeedResult> SeedCatalogAsync(EquipmentCatalogSeed catalog, int seed = Seed)
     {
         await using var scope = Fixture.Factory.Services.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<EquipmentCatalogSeeder>()
-            .SeedAsync(catalog, Seed, InventorySeedData.Anchor, Cancellation);
+            .SeedAsync(catalog, seed, InventorySeedData.Anchor, Cancellation);
     }
 
     private async Task<PagedResult<EquipmentSummary>> SearchAllAsync()

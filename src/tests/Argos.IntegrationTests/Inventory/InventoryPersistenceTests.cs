@@ -26,9 +26,6 @@ namespace Argos.IntegrationTests.Inventory;
 /// </summary>
 public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationTestBase(fixture)
 {
-    private const string Saint = InventorySeedData.Saint;
-    private const string Downtown = InventorySeedData.Downtown;
-
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -52,7 +49,7 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
     public async Task ChangingLocation_UpdatesColumnsInPlace_WithoutDelete_Plan12()
     {
         var scenario = await SeedReferenceAsync();
-        var created = await CreateCameraAsync(scenario, "CAM-001", scenario.SaintId);
+        var created = await CreateCameraAsync(scenario, "CAM-001", scenario.HesperiaId);
 
         var updated = await UseAsync<EquipmentService, EquipmentDetails>(service => service.UpdateAsync(
             created.Id,
@@ -62,14 +59,14 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
                 Brand = created.Brand,
                 Model = created.Model,
                 OrganizationId = scenario.OrganizationId,
-                Location = Location(scenario.DowntownId, "Avenida Brasil", "oposto ao número 50", -22.265, -49.665),
-                Attributes = CameraAttributes("full-hd-1080p"),
+                Location = InventoryScenario.Location(scenario.DowntownId, "Avenida Brasil", "oposto ao número 50", -22.265, -49.665),
+                Attributes = InventoryScenario.CameraAttributes("full-hd-1080p"),
                 Version = created.Version,
             },
             Cancellation));
 
         Assert.Equal(created.Id, updated.Id);
-        Assert.Equal(Downtown, updated.NeighborhoodName);
+        Assert.Equal(InventorySeedData.Downtown, updated.NeighborhoodName);
         Assert.Equal("Avenida Brasil", updated.Location!.Street);
         Assert.Equal(-22.265, updated.Location.Latitude);
         Assert.NotEqual(created.Version, updated.Version);
@@ -83,7 +80,7 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
     public async Task OnlyNewMaintenance_DoesNotRewriteEquipmentRow_AttributesComparedByContent_Plan12()
     {
         var scenario = await SeedReferenceAsync();
-        var created = await CreateCameraAsync(scenario, "CAM-002", scenario.SaintId);
+        var created = await CreateCameraAsync(scenario, "CAM-002", scenario.HesperiaId);
 
         await UseAsync<MaintenanceService, MaintenanceData>(service => service.RegisterAsync(
             created.Id, new RegisterMaintenanceRequest { Kind = MaintenanceKind.Immediate }, Cancellation));
@@ -100,8 +97,8 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
                 Brand = created.Brand,
                 Model = created.Model,
                 OrganizationId = scenario.OrganizationId,
-                Location = SaintLocation(scenario),
-                Attributes = CameraAttributes("qhd-2k"),
+                Location = scenario.HesperiaLocation(),
+                Attributes = InventoryScenario.CameraAttributes("qhd-2k"),
                 Version = afterMaintenance.Version,
             },
             Cancellation));
@@ -117,15 +114,15 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
         var scenario = await SeedReferenceAsync();
         var today = await UseAsync<MunicipalCalendar, DateOnly>(calendar => calendar.TodayAsync(Cancellation));
 
-        var none = await CreateCameraAsync(scenario, "NEED-NONE", scenario.SaintId);
-        var scheduled = await CreateCameraAsync(scenario, "NEED-SCHEDULED", scenario.SaintId, Scheduled(today.AddDays(30)));
-        var upcomingEdge = await CreateCameraAsync(scenario, "NEED-UPCOMING", scenario.SaintId, Scheduled(today.AddDays(7)));
-        var overdue = await CreateCameraAsync(scenario, "NEED-OVERDUE", scenario.SaintId, Periodic(today.AddDays(-2)));
+        var none = await CreateCameraAsync(scenario, "NEED-NONE", scenario.HesperiaId);
+        var scheduled = await CreateCameraAsync(scenario, "NEED-SCHEDULED", scenario.HesperiaId, InventoryScenario.Scheduled(today.AddDays(30)));
+        var upcomingEdge = await CreateCameraAsync(scenario, "NEED-UPCOMING", scenario.HesperiaId, InventoryScenario.Scheduled(today.AddDays(7)));
+        var overdue = await CreateCameraAsync(scenario, "NEED-OVERDUE", scenario.HesperiaId, InventoryScenario.Periodic(today.AddDays(-2)));
         await UseAsync<MaintenanceService, MaintenanceData>(service => service.RegisterAsync(
-            overdue.Id, Scheduled(today.AddDays(3)), Cancellation));
+            overdue.Id, InventoryScenario.Scheduled(today.AddDays(3)), Cancellation));
         var immediate = await CreateCameraAsync(
-            scenario, "NEED-IMMEDIATE", scenario.SaintId, status: EquipmentStatus.Malfunction);
-        var mobileToday = await CreateMotorcycleAsync(scenario, "NEED-MOBILE", Periodic(today));
+            scenario, "NEED-IMMEDIATE", scenario.HesperiaId, status: EquipmentStatus.Malfunction);
+        var mobileToday = await CreateMotorcycleAsync(scenario, "NEED-MOBILE", InventoryScenario.Periodic(today));
 
         var expected = new Dictionary<Guid, MaintenanceNeed>
         {
@@ -158,12 +155,12 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
     public async Task Search_IgnoresAccentsAndCase_EscapesWildcards_AndCombinesFilters_US03()
     {
         var scenario = await SeedReferenceAsync();
-        var fixedInSaint = await CreateCameraAsync(scenario, "SRCH-001", scenario.SaintId);
+        var fixedInHesperia = await CreateCameraAsync(scenario, "SRCH-001", scenario.HesperiaId);
         var fixedDowntown = await CreateCameraAsync(scenario, "SRCH-002", scenario.DowntownId);
         var mobile = await CreateMotorcycleAsync(scenario, "SRCH-003");
 
-        var byNeighborhood = await SearchAsync(new EquipmentSearchQuery { Search = "SAO jorge" });
-        Assert.Equal([fixedInSaint.Id], byNeighborhood.Items.Select(item => item.Id));
+        var byNeighborhood = await SearchAsync(new EquipmentSearchQuery { Search = "HESPÉRIA" });
+        Assert.Equal([fixedInHesperia.Id], byNeighborhood.Items.Select(item => item.Id));
 
         var bySerial = await SearchAsync(new EquipmentSearchQuery { Search = "srch-00" });
         Assert.Equal(3, bySerial.TotalCount);
@@ -196,7 +193,7 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
         var scenario = await SeedReferenceAsync();
         var today = await UseAsync<MunicipalCalendar, DateOnly>(calendar => calendar.TodayAsync(Cancellation));
         var created = await CreateCameraAsync(
-            scenario, "CAM-003", scenario.SaintId, Periodic(today.AddDays(-1)), EquipmentStatus.UnderMaintenance);
+            scenario, "CAM-003", scenario.HesperiaId, InventoryScenario.Periodic(today.AddDays(-1)), EquipmentStatus.UnderMaintenance);
         var periodic = created.OpenMaintenances.Single();
 
         var completion = await UseAsync<MaintenanceService, MaintenanceCompletionData>(service => service.CompleteAsync(
@@ -225,7 +222,7 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
     public async Task DuplicateBrandAndSerial_CaughtByUniqueIndex_ReturnsConflictWithExistingId_RN01()
     {
         var scenario = await SeedReferenceAsync();
-        var existing = await CreateCameraAsync(scenario, "ABC-123", scenario.SaintId);
+        var existing = await CreateCameraAsync(scenario, "ABC-123", scenario.HesperiaId);
 
         // Grava direto pelas portas, sem a verificação da Aplicação, como a segunda de duas gravações simultâneas.
         await using var scope = Fixture.Factory.Services.CreateAsyncScope();
@@ -236,7 +233,7 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
             .FindByIdAsync(scenario.OrganizationId, Cancellation);
         var municipality = await services.GetRequiredService<IMunicipalityRepository>().GetAsync(Cancellation);
         var neighborhood = await services.GetRequiredService<INeighborhoodRepository>()
-            .FindByIdAsync(scenario.SaintId, Cancellation);
+            .FindByIdAsync(scenario.HesperiaId, Cancellation);
         var duplicate = DomainEquipment.Register(
             type!,
             "abc-123",
@@ -245,7 +242,7 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
             organization,
             DomainLocation.Create(municipality!, neighborhood!, "16985-001", "Rua das Flores", "número 10", -22.241, -49.641),
             null,
-            CameraAttributes("hd-720p").ToDictionary(entry => entry.Key, entry => (object?)entry.Value),
+            InventoryScenario.CameraAttributes("hd-720p").ToDictionary(entry => entry.Key, entry => (object?)entry.Value),
             DomainEquipmentStatus.Operational,
             DateTimeOffset.UtcNow,
             "teste");
@@ -262,7 +259,7 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
     public async Task ConcurrentStatusChanges_SecondSaveReturnsConflict_D60()
     {
         var scenario = await SeedReferenceAsync();
-        var created = await CreateCameraAsync(scenario, "CAM-004", scenario.SaintId);
+        var created = await CreateCameraAsync(scenario, "CAM-004", scenario.HesperiaId);
 
         await using var first = Fixture.Factory.Services.CreateAsyncScope();
         await using var second = Fixture.Factory.Services.CreateAsyncScope();
@@ -285,7 +282,7 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
     public async Task DatabaseCleaner_EmptiesTheInventoryTables_Plan8_2()
     {
         var scenario = await SeedReferenceAsync();
-        await CreateCameraAsync(scenario, "CAM-005", scenario.SaintId);
+        await CreateCameraAsync(scenario, "CAM-005", scenario.HesperiaId);
 
         await Fixture.ResetDatabaseAsync();
 
@@ -300,90 +297,22 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
             .FindAppliedSeedAsync(InventorySeed.ReferenceVersion, Cancellation));
     }
 
-    /// <summary>Referência pequena de <see cref="InventorySeedData"/>, pela carga <c>inventory-reference-v1</c>.</summary>
-    private async Task<Scenario> SeedReferenceAsync()
-    {
-        await UseAsync<InventoryReferenceSeeder, SeedResult>(seeder => seeder.SeedAsync(
-            InventorySeedData.Reference(), seed: 42, registeredAt: DateTimeOffset.UtcNow.AddDays(-1), Cancellation));
-
-        await using var scope = Fixture.Factory.Services.CreateAsyncScope();
-        var queries = scope.ServiceProvider.GetRequiredService<IInventoryQueries>();
-        var neighborhoods = await queries.ListNeighborhoodsAsync(regionId: null, includeInactive: false, Cancellation);
-        var types = await queries.ListEquipmentTypesAsync(includeInactive: false, Cancellation);
-        var saint = neighborhoods.Single(neighborhood => neighborhood.Name == Saint);
-
-        return new Scenario(
-            saint.RegionId,
-            saint.Id,
-            neighborhoods.Single(neighborhood => neighborhood.Name == Downtown).Id,
-            (await queries.ListOrganizationsAsync(includeInactive: false, Cancellation)).Single().Id,
-            (await queries.ListOperationalBasesAsync(organizationId: null, includeInactive: false, Cancellation)).Single().Id,
-            types.Single(type => type.Key == EquipmentTypeCatalog.SurveillanceCamera).Id,
-            types.Single(type => type.Key == EquipmentTypeCatalog.TrafficAgentMotorcycle).Id);
-    }
+    private Task<InventoryScenario> SeedReferenceAsync() => InventoryScenario.CreateAsync(Fixture, Cancellation);
 
     private Task<EquipmentDetails> CreateCameraAsync(
-        Scenario scenario,
+        InventoryScenario scenario,
         string serialNumber,
         Guid neighborhoodId,
         RegisterMaintenanceRequest? initialMaintenance = null,
         EquipmentStatus status = EquipmentStatus.Operational) =>
         UseAsync<EquipmentService, EquipmentDetails>(service => service.CreateAsync(
-            new CreateEquipmentRequest
-            {
-                TypeId = scenario.CameraTypeId,
-                SerialNumber = serialNumber,
-                Brand = "Ômega Vision",
-                Model = "OV-200",
-                OrganizationId = scenario.OrganizationId,
-                Location = neighborhoodId == scenario.SaintId
-                    ? SaintLocation(scenario)
-                    : Location(neighborhoodId, "Avenida Brasil", "número 200", -22.262, -49.662),
-                Attributes = CameraAttributes("full-hd-1080p"),
-                Status = status,
-                InitialMaintenance = initialMaintenance,
-            },
+            scenario.Camera(serialNumber, status, initialMaintenance, downtown: neighborhoodId == scenario.DowntownId),
             Cancellation));
 
     private Task<EquipmentDetails> CreateMotorcycleAsync(
-        Scenario scenario, string serialNumber, RegisterMaintenanceRequest? initialMaintenance = null) =>
+        InventoryScenario scenario, string serialNumber, RegisterMaintenanceRequest? initialMaintenance = null) =>
         UseAsync<EquipmentService, EquipmentDetails>(service => service.CreateAsync(
-            new CreateEquipmentRequest
-            {
-                TypeId = scenario.MotorcycleTypeId,
-                SerialNumber = serialNumber,
-                Brand = "Moto Sul",
-                Model = "MS 300",
-                OrganizationId = scenario.OrganizationId,
-                BaseId = scenario.BaseId,
-                Attributes = new Dictionary<string, string?> { ["licensePlate"] = "ABC1D23", ["prefix"] = $"M-{serialNumber}" },
-                Status = EquipmentStatus.Operational,
-                InitialMaintenance = initialMaintenance,
-            },
-            Cancellation));
-
-    private static LocationInput SaintLocation(Scenario scenario) =>
-        Location(scenario.SaintId, "Rua das Flores", "número 181", -22.241, -49.641);
-
-    private static LocationInput Location(Guid neighborhoodId, string street, string reference, double latitude, double longitude) =>
-        new()
-        {
-            ZipCode = "16985-001",
-            Street = street,
-            NeighborhoodId = neighborhoodId,
-            Reference = reference,
-            Latitude = latitude,
-            Longitude = longitude,
-        };
-
-    private static Dictionary<string, string?> CameraAttributes(string resolution) =>
-        new() { ["resolution"] = resolution, ["colorMode"] = "color", ["nightVision"] = "true", ["panTiltZoom"] = "false" };
-
-    private static RegisterMaintenanceRequest Scheduled(DateOnly dueDate) =>
-        new() { Kind = MaintenanceKind.Scheduled, DueDate = dueDate };
-
-    private static RegisterMaintenanceRequest Periodic(DateOnly dueDate) =>
-        new() { Kind = MaintenanceKind.Periodic, DueDate = dueDate, PeriodicityDays = 30 };
+            scenario.Motorcycle(serialNumber, initialMaintenance), Cancellation));
 
     private Task<EquipmentDetails> DetailsAsync(Guid id) =>
         UseAsync<EquipmentQueryService, EquipmentDetails>(service => service.GetDetailsAsync(id, Cancellation));
@@ -398,13 +327,4 @@ public sealed class InventoryPersistenceTests(ApiFixture fixture) : IntegrationT
         await using var scope = Fixture.Factory.Services.CreateAsyncScope();
         return await action(scope.ServiceProvider.GetRequiredService<TService>());
     }
-
-    private sealed record Scenario(
-        Guid RegionId,
-        Guid SaintId,
-        Guid DowntownId,
-        Guid OrganizationId,
-        Guid BaseId,
-        Guid CameraTypeId,
-        Guid MotorcycleTypeId);
 }

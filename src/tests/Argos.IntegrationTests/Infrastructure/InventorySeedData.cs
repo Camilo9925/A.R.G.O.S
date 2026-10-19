@@ -8,7 +8,7 @@ namespace Argos.IntegrationTests.Infrastructure;
 /// </summary>
 internal static class InventorySeedData
 {
-    public const string Saint = "São Jorge";
+    public const string Hesperia = "Vila Hespéria";
     public const string Downtown = "Centro";
     public const string Organization = "DMT";
     public const string Base = "Base Central";
@@ -27,10 +27,10 @@ internal static class InventorySeedData
             [new RegionSeed("Zona Única", Square)],
             neighborhoods ??
             [
-                new NeighborhoodSeed(Saint, "Zona Única", new SeedPoint(-22.24, -49.64)),
+                new NeighborhoodSeed(Hesperia, "Zona Única", new SeedPoint(-22.24, -49.64)),
                 new NeighborhoodSeed(Downtown, "Zona Única", new SeedPoint(-22.26, -49.66)),
             ],
-            [new ZipCodeSeed("16985001", "Rua das Flores", Saint, new SeedPoint(-22.241, -49.641))],
+            [new ZipCodeSeed("16985001", "Rua das Flores", Hesperia, new SeedPoint(-22.241, -49.641))],
             [new OrganizationSeed(Organization, "Departamento Municipal de Trânsito")],
             [
                 new OperationalBaseSeed(

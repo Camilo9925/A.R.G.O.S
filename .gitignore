@@ -430,3 +430,6 @@ FodyWeavers.xsd
 # SDD documents and brand source files (local only, not versioned)
 specs/
 assets/
+
+# Claude Code output styles (local only, not versioned)
+.claude/output-styles/

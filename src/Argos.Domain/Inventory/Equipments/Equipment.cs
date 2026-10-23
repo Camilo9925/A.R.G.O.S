@@ -9,8 +9,10 @@ namespace Argos.Domain.Inventory.Equipments;
 /// Equipamento fixo ou móvel (RF-001, RF-002, RF-007 a RF-009, US-01 a US-05, RN-01, RN-04 a RN-11, RN-22;
 /// plan 15.2.6 a 15.2.8, 15.3, 15.4). Raiz do agregado: situação, histórico de situação e manutenções só mudam pelas
 /// operações daqui. As coleções de histórico e de manutenções não precisam vir inteiras do banco: o histórico só
-/// recebe registros novos, e as regras usam apenas as manutenções abertas. Nunca é excluído, só inativado (RN-23;
-/// a inativação entra na Fase 3).
+/// recebe registros novos, e as regras usam apenas as manutenções abertas. Nunca é excluído, só inativado (RN-23,
+/// RN-35); inativado, não é editado, não muda de situação, não recebe manutenção e não volta a ficar ativo. O
+/// agregado não conhece agentes: o encerramento dos vínculos na inativação é coordenado pela <c>AssignmentPolicy</c>
+/// (D-62; plan 15.2.10).
 /// </summary>
 public sealed class Equipment : IAuditable, IDeactivatable
 {
@@ -23,6 +25,16 @@ public sealed class Equipment : IAuditable, IDeactivatable
     public const int CompletionNotesMaxLength = 1000;
     public const int MinPeriodicityDays = 1;
     public const int MaxPeriodicityDays = 3650;
+    public const int InactivationReasonMaxLength = 500;
+
+    /// <summary>Motivo do cancelamento das manutenções abertas na inativação do cadastro (RN-35; plan 15.4).</summary>
+    public const string InactivationCancellationReason = "Cancelada automaticamente: equipamento inativado.";
+
+    /// <summary>Situações em que o cadastro pode ser inativado (RN-35), na ordem do ciclo de vida.</summary>
+    public static readonly IReadOnlyList<EquipmentStatus> InactivatableStatuses =
+        [EquipmentStatus.NotInstalled, EquipmentStatus.Deactivated, EquipmentStatus.Stolen];
+
+    private const string InactiveMaintenanceMessage = "Equipamento inativo não recebe manutenção.";
 
     private readonly List<Maintenance> _maintenances = [];
     private readonly List<EquipmentStatusChange> _statusChanges = [];
@@ -155,8 +167,9 @@ public sealed class Equipment : IAuditable, IDeactivatable
     /// <summary>
     /// Edita o cadastro; tipo e categoria não mudam (D-66). Devolve os campos alterados para o registro cadastral
     /// (D-49); sem alteração, lista vazia e nada a gravar. Órgão ou base que ficaram inativos continuam aceitos se já
-    /// eram os do equipamento; trocar para um inativo é recusado (plan 15.2.2).
+    /// eram os do equipamento; trocar para um inativo é recusado (plan 15.2.2). Cadastro inativo não é editado (RN-35).
     /// </summary>
+    /// <exception cref="InventoryRuleException">Cadastro inativo (RN-35).</exception>
     public IReadOnlyList<FieldChange> UpdateRegistration(
         EquipmentType type,
         string serialNumber,
@@ -168,6 +181,7 @@ public sealed class Equipment : IAuditable, IDeactivatable
         IReadOnlyDictionary<string, object?>? attributes)
     {
         ArgumentNullException.ThrowIfNull(type);
+        EnsureActive("Equipamento inativo não pode ser editado.");
 
         if (type.Id != TypeId)
         {
@@ -200,26 +214,32 @@ public sealed class Equipment : IAuditable, IDeactivatable
         return changes;
     }
 
-    /// <summary>Situações de destino a partir da atual, com a indicação de justificativa, já filtradas pela permissão (D-59).</summary>
+    /// <summary>
+    /// Situações de destino a partir da atual, com a indicação de justificativa, já filtradas pela permissão (D-59).
+    /// Vazia em cadastro inativo, que não muda de situação (RN-35).
+    /// </summary>
     public IReadOnlyList<StatusChangeOption> AllowedStatusChanges(bool canReactivate) =>
-        EquipmentStatusTransitions.TargetsFrom(Status)
-            .Where(target => canReactivate || !EquipmentStatusTransitions.IsReactivation(Status, target))
-            .Select(target => new StatusChangeOption(target, EquipmentStatusTransitions.RequiresJustification(Status, target)))
-            .ToArray();
+        !IsActive
+            ? []
+            : EquipmentStatusTransitions.TargetsFrom(Status)
+                .Where(target => canReactivate || !EquipmentStatusTransitions.IsReactivation(Status, target))
+                .Select(target => new StatusChangeOption(target, EquipmentStatusTransitions.RequiresJustification(Status, target)))
+                .ToArray();
 
     /// <summary>
-    /// Muda a situação (US-04), com as verificações 2 a 5 de plan 15.3, nessa ordem; a verificação 1 (cadastro
-    /// ativo, RN-35) entra na Fase 3. Efeitos: registro no histórico; RN-07 ao entrar em Mau funcionamento;
-    /// cancelamento das manutenções abertas ao entrar em Desativado ou Furtado (RN-11).
+    /// Muda a situação (US-04), com as verificações 1 a 5 de plan 15.3, nessa ordem. Efeitos: registro no histórico;
+    /// RN-07 ao entrar em Mau funcionamento; cancelamento das manutenções abertas ao entrar em Desativado ou Furtado
+    /// (RN-11).
     /// </summary>
     /// <param name="canReactivate">Se o ator tem <c>resources.reactivate</c> (D-47); a carga inicial passa <c>true</c>.</param>
-    /// <exception cref="InventoryRuleException">Mesma situação ou transição fora da RN-05.</exception>
+    /// <exception cref="InventoryRuleException">Cadastro inativo (RN-35), mesma situação ou transição fora da RN-05.</exception>
     /// <exception cref="ReactivationNotAllowedException">Reativação sem permissão.</exception>
     /// <exception cref="DomainValidationException">Justificativa ausente ou inválida (RN-06), no campo <c>justification</c>.</exception>
     public void ChangeStatus(
         EquipmentStatus target, string? justification, bool canReactivate, DateTimeOffset at, string by)
     {
         var author = InventoryAuthor.Valid(by);
+        EnsureActive("Equipamento inativo não pode mudar de situação.");
 
         if (target == Status)
         {
@@ -242,9 +262,9 @@ public sealed class Equipment : IAuditable, IDeactivatable
     }
 
     /// <summary>
-    /// Registra uma manutenção (US-05), com as regras de plan 15.4: campos por tipo (RN-08, erros de campo antes das
-    /// regras sem campo), nenhuma em Desativado ou Furtado (RN-11) e uma só imediata aberta (RN-07). A verificação
-    /// de cadastro ativo (RN-35) entra na Fase 3.
+    /// Registra uma manutenção (US-05), com as regras de plan 15.4, na ordem da tabela: cadastro ativo (RN-35), campos
+    /// por tipo (RN-08, erros de campo antes das demais regras sem campo), nenhuma em Desativado ou Furtado (RN-11) e
+    /// uma só imediata aberta (RN-07).
     /// </summary>
     /// <param name="today">Data de hoje no fuso do município (D-54).</param>
     public Maintenance RegisterMaintenance(
@@ -257,6 +277,7 @@ public sealed class Equipment : IAuditable, IDeactivatable
         string by)
     {
         var author = InventoryAuthor.Valid(by);
+        EnsureActive(InactiveMaintenanceMessage);
         var errors = new FieldErrors();
 
         if (!Enum.IsDefined(kind))
@@ -337,7 +358,7 @@ public sealed class Equipment : IAuditable, IDeactivatable
     /// Conclui uma manutenção aberta (US-05; plan 15.4): grava a conclusão; aplica a RN-11 à situação; e, se ela
     /// era periódica, programa a próxima para a data da conclusão no fuso do município + periodicidade, com sucesso ou
     /// sem (RN-09). Conferir se a manutenção existe (404) é da Aplicação; aqui, uma que não esteja entre as abertas é
-    /// recusada com 409.
+    /// recusada com 409, assim como qualquer conclusão em cadastro inativo (RN-35), que já não tem manutenção aberta.
     /// </summary>
     /// <param name="completedAt">Instante da conclusão: não futuro nem anterior à abertura.</param>
     /// <param name="timeZone">Fuso do município, para a data da conclusão (RN-09; D-54).</param>
@@ -352,6 +373,7 @@ public sealed class Equipment : IAuditable, IDeactivatable
     {
         ArgumentNullException.ThrowIfNull(timeZone);
         var author = InventoryAuthor.Valid(by);
+        EnsureActive(InactiveMaintenanceMessage);
 
         var maintenance = _maintenances.FirstOrDefault(candidate => candidate.Id == maintenanceId && candidate.IsOpen)
             ?? throw new InventoryRuleException("A manutenção não está aberta.");
@@ -401,6 +423,44 @@ public sealed class Equipment : IAuditable, IDeactivatable
     /// <summary>Necessidade de manutenção a partir das manutenções abertas (RN-10; D-54).</summary>
     public MaintenanceNeed CalculateMaintenanceNeed(DateOnly today, int upcomingWindowDays) =>
         MaintenanceNeedCalculator.Calculate(_maintenances, today, upcomingWindowDays);
+
+    /// <summary>
+    /// Inativa o cadastro (US-09, RN-35; plan 15.2.6): só em Ainda não instalado, Desativado ou Furtado, uma única vez,
+    /// sem volta. Cancela as manutenções abertas com <see cref="InactivationCancellationReason"/> (na prática, só Ainda
+    /// não instalado pode tê-las, porque a RN-11 já as cancela em Desativado e Furtado). Devolve o registro cadastral
+    /// <see cref="InventoryChangeKind.Inactivated"/>, com o motivo, para a Aplicação gravar (D-49). Não existe
+    /// exclusão (RN-23). Com agentes vinculados, a Aplicação chama pela <c>AssignmentPolicy</c>, que também encerra os
+    /// vínculos (D-62).
+    /// </summary>
+    /// <param name="reason">Motivo opcional, até <see cref="InactivationReasonMaxLength"/> caracteres.</param>
+    /// <exception cref="InventoryRuleException">Cadastro já inativo ou situação fora da RN-35.</exception>
+    /// <exception cref="DomainValidationException">Motivo longo demais, no campo <c>reason</c>.</exception>
+    public InventoryChange Inactivate(string? reason, DateTimeOffset at, string by)
+    {
+        var author = InventoryAuthor.Valid(by);
+        EnsureActive("O equipamento já está inativo.");
+
+        var errors = new FieldErrors();
+        var validReason = errors.OptionalText("reason", reason, InactivationReasonMaxLength, "o motivo");
+        errors.ThrowIfAny();
+
+        if (!InactivatableStatuses.Contains(Status))
+        {
+            throw new InventoryRuleException(
+                $"Equipamento {EquipmentStatusLabels.For(Status)} não pode ser inativado. A inativação só é possível nas "
+                + "situações Ainda não instalado, Desativado ou Furtado.");
+        }
+
+        foreach (var open in _maintenances.Where(maintenance => maintenance.IsOpen).ToArray())
+        {
+            open.Cancel(InactivationCancellationReason, at, author);
+        }
+
+        IsActive = false;
+        DeactivatedAt = at.ToUniversalTime();
+        DeactivatedBy = author;
+        return InventoryChange.Inactivated(InventoryEntityType.Equipment, Id, validReason, at, author);
+    }
 
     /// <summary>RN-11: com sucesso volta a Operacional; sem sucesso passa para, ou permanece em, Mau funcionamento.</summary>
     private void ApplyCompletionResult(Maintenance maintenance, MaintenanceResult result, DateTimeOffset at, string author)
@@ -464,6 +524,15 @@ public sealed class Equipment : IAuditable, IDeactivatable
             null,
             at,
             author));
+
+    /// <summary>Cadastro inativo não é editado, não muda de situação e não recebe manutenção (RN-35): 409 com o motivo.</summary>
+    private void EnsureActive(string message)
+    {
+        if (!IsActive)
+        {
+            throw new InventoryRuleException(message);
+        }
+    }
 
     private static string? ValidJustification(string? justification, bool required)
     {

@@ -101,3 +101,86 @@ public enum AttributeDataType
     Option,
     MultiOption,
 }
+
+/// <summary>Função do agente (RF-014).</summary>
+public enum AgentRole
+{
+    /// <summary>Agente de trânsito.</summary>
+    TrafficAgent,
+
+    /// <summary>Guarda municipal.</summary>
+    MunicipalGuard,
+
+    /// <summary>Policial militar.</summary>
+    MilitaryPolice,
+}
+
+/// <summary>Situação de um agente (RN-12). A inicial é Fora de serviço (US-06).</summary>
+public enum AgentStatus
+{
+    /// <summary>Em serviço.</summary>
+    OnDuty,
+
+    /// <summary>Em atendimento.</summary>
+    Responding,
+
+    /// <summary>Em pausa.</summary>
+    OnBreak,
+
+    /// <summary>Fora de serviço.</summary>
+    OffDuty,
+
+    /// <summary>Afastado.</summary>
+    OnLeave,
+}
+
+/// <summary>Por que um vínculo entre agente e equipamento móvel foi encerrado (plan 15.2.10).</summary>
+public enum AssignmentEndReason
+{
+    /// <summary>O agente foi vinculado a outro equipamento (US-07).</summary>
+    Reassigned,
+
+    /// <summary>Encerrado por uma pessoa (RF-016).</summary>
+    Ended,
+
+    /// <summary>O agente foi inativado (RN-35).</summary>
+    AgentInactivated,
+
+    /// <summary>O equipamento foi inativado (RN-35).</summary>
+    EquipmentInactivated,
+}
+
+/// <summary>
+/// Tipo de uma entrada da linha do tempo (US-08; plan 15.6). Não espelha um enum do Domínio: a linha do tempo é uma
+/// projeção das fontes do histórico, montada pela consulta e pela Aplicação. A Central (Camada 2) acrescentará os de
+/// alerta.
+/// </summary>
+public enum TimelineEntryKind
+{
+    /// <summary>Cadastro, com a situação inicial (US-01, US-06).</summary>
+    Registered,
+
+    /// <summary>Mudança de situação (RN-05, RN-12).</summary>
+    StatusChanged,
+
+    /// <summary>Manutenção aberta (RN-07, RN-08, RN-09).</summary>
+    MaintenanceOpened,
+
+    /// <summary>Manutenção concluída, com sucesso ou sem sucesso (US-05).</summary>
+    MaintenanceCompleted,
+
+    /// <summary>Manutenção cancelada automaticamente (RN-11, RN-35).</summary>
+    MaintenanceCancelled,
+
+    /// <summary>Alteração de cadastro, com os campos alterados (D-49).</summary>
+    RegistrationUpdated,
+
+    /// <summary>Inativação do cadastro (RN-35).</summary>
+    Inactivated,
+
+    /// <summary>Início de um vínculo entre agente e equipamento móvel (US-07).</summary>
+    CrewAssigned,
+
+    /// <summary>Encerramento de um vínculo (US-07, RN-35).</summary>
+    CrewUnassigned,
+}

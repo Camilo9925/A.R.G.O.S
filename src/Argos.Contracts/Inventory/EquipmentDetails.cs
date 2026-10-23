@@ -66,6 +66,12 @@ public sealed record EquipmentDetails
     /// </summary>
     public IReadOnlyList<StatusChangeOptionData> AllowedStatusChanges { get; init; } = [];
 
+    /// <summary>
+    /// Agentes com vínculo aberto com o equipamento, por nome de exibição (US-07). Vazia nos tipos que não recebem
+    /// vínculo e no cadastro inativo, porque a inativação encerra os vínculos (RN-35).
+    /// </summary>
+    public IReadOnlyList<AssignedAgentData> AssignedAgents { get; init; } = [];
+
     public bool IsActive { get; init; }
 
     /// <summary>Versão do cadastro lida, devolvida na edição (D-60).</summary>

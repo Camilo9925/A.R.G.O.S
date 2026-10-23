@@ -7,8 +7,8 @@ namespace Argos.Contracts.Inventory;
 /// Pesquisa de equipamentos (US-03, RF-010; D-53; plan 15.8). O termo procura, sem acento e sem diferença de
 /// maiúsculas, em número de série, marca, modelo, rua, referência e bairro. Cada filtro aceita vários valores, que
 /// combinam por "ou"; filtros diferentes combinam por "e". Na query string, um filtro com vários valores se repete
-/// (<c>?status=Malfunction&amp;status=Stolen</c>), por isso os nomes ficam no singular. O filtro de ativos e inativos
-/// entra na Fase 3 (T082); até lá a pesquisa devolve os ativos.
+/// (<c>?status=Malfunction&amp;status=Stolen</c>), por isso os nomes ficam no singular. <see cref="Activity"/> separa
+/// ativos e inativos (padrão: ativos; US-09, RN-35).
 /// </summary>
 public sealed record EquipmentSearchQuery : PageQuery
 {
@@ -28,6 +28,9 @@ public sealed record EquipmentSearchQuery : PageQuery
     public List<MaintenanceNeed> MaintenanceNeed { get; set; } = [];
 
     public List<EquipmentCategory> Category { get; set; } = [];
+
+    /// <summary>Ativos (padrão), inativos ou todos (RF-010, US-09).</summary>
+    public ActivityFilter Activity { get; set; } = ActivityFilter.Active;
 }
 
 /// <summary>Valores aceitos em <see cref="PageQuery.Sort"/> na pesquisa de equipamentos (plan 15.8).</summary>

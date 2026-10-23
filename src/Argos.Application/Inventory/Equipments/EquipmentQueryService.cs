@@ -24,19 +24,15 @@ public sealed class EquipmentQueryService(
 {
     internal const string NotFoundMessage = "Equipamento não encontrado.";
 
-    /// <summary>Pesquisa paginada (US-03). A ordenação é de uma lista fechada (<see cref="EquipmentSortFields"/>).</summary>
+    /// <summary>
+    /// Pesquisa paginada (US-03, RF-010). A ordenação é de uma lista fechada (<see cref="EquipmentSortFields"/>), e o
+    /// filtro de ativos e inativos segue para a consulta (padrão: ativos; US-09, RN-35).
+    /// </summary>
     public async Task<PagedResult<EquipmentSummary>> SearchAsync(
         EquipmentSearchQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        ValidatePage(query.Page, query.PageSize);
-
-        var sort = string.IsNullOrWhiteSpace(query.Sort) ? EquipmentSortFields.Default : query.Sort.Trim();
-        if (!EquipmentSortFields.All.Contains(sort))
-        {
-            throw new ValidationFailedException(
-                "sort", $"Ordenação inválida. Use uma destas: {string.Join(", ", EquipmentSortFields.All)}.");
-        }
+        var sort = PageValidation.ValidateSearch(query, EquipmentSortFields.All, EquipmentSortFields.Default, query.Activity);
 
         var (today, window) = await MaintenanceCalendarAsync(cancellationToken);
         return await queries.SearchEquipmentAsync(query with { Sort = sort }, today, window, cancellationToken);
@@ -83,7 +79,7 @@ public sealed class EquipmentQueryService(
         Guid id, PageQuery page, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(page);
-        ValidatePage(page.Page, page.PageSize);
+        PageValidation.Validate(page.Page, page.PageSize);
         await EnsureExistsAsync(id, cancellationToken);
 
         return await queries.ListStatusChangesAsync(id, page.Page, page.PageSize, cancellationToken);
@@ -99,26 +95,6 @@ public sealed class EquipmentQueryService(
         if (!await queries.EquipmentExistsAsync(id, cancellationToken))
         {
             throw new NotFoundException(NotFoundMessage);
-        }
-    }
-
-    private static void ValidatePage(int page, int pageSize)
-    {
-        var errors = new Dictionary<string, string[]>();
-
-        if (page < 1)
-        {
-            errors["page"] = ["A página deve ser 1 ou maior."];
-        }
-
-        if (pageSize is < 1 or > PageQuery.MaxPageSize)
-        {
-            errors["pageSize"] = [$"O tamanho da página deve estar entre 1 e {PageQuery.MaxPageSize}."];
-        }
-
-        if (errors.Count > 0)
-        {
-            throw new ValidationFailedException(errors);
         }
     }
 }

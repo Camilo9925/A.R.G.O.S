@@ -1,5 +1,7 @@
 using Argos.Application.Inventory;
+using Argos.Application.Inventory.Agents;
 using Argos.Contracts.Common;
+using Argos.Domain.Inventory.Agents;
 using Argos.Domain.Inventory.Equipments;
 using Argos.Domain.Inventory.Geography;
 using Argos.Domain.Inventory.Support;
@@ -10,11 +12,14 @@ namespace Argos.UnitTests.Application.Fakes;
 
 /// <summary>
 /// Consultas sobre o <see cref="FakeInventory"/>, com o mapeamento mínimo de que os testes da Aplicação precisam. A
-/// pesquisa não filtra: devolve todos os equipamentos e guarda a consulta recebida para o teste conferir.
+/// pesquisa só aplica o filtro de ativos e inativos (como a consulta real) e guarda a consulta recebida para o teste
+/// conferir os demais.
 /// </summary>
-internal sealed class FakeInventoryQueries(FakeInventory inventory) : IInventoryQueries
+internal sealed class FakeInventoryQueries(FakeInventory inventory) : IInventoryQueries, IAgentQueries
 {
     public C.EquipmentSearchQuery? LastSearch { get; private set; }
+
+    public C.AgentSearchQuery? LastAgentSearch { get; private set; }
 
     public (DateOnly Today, int Window)? LastSearchCalendar { get; private set; }
 
@@ -102,15 +107,19 @@ internal sealed class FakeInventoryQueries(FakeInventory inventory) : IInventory
         LastSearch = query;
         LastSearchCalendar = (today, upcomingWindowDays);
 
-        var items = inventory.Equipment.Select(equipment => new C.EquipmentSummary
-        {
-            Id = equipment.Id,
-            SerialNumber = equipment.SerialNumber,
-            Brand = equipment.Brand,
-            Model = equipment.Model,
-            Status = Convert<C.EquipmentStatus>(equipment.Status),
-            MaintenanceNeed = Convert<C.MaintenanceNeed>(equipment.CalculateMaintenanceNeed(today, upcomingWindowDays)),
-        }).ToArray();
+        var items = inventory.Equipment
+            .Where(equipment => Matches(query.Activity, equipment.IsActive))
+            .Select(equipment => new C.EquipmentSummary
+            {
+                Id = equipment.Id,
+                SerialNumber = equipment.SerialNumber,
+                Brand = equipment.Brand,
+                Model = equipment.Model,
+                Status = Convert<C.EquipmentStatus>(equipment.Status),
+                MaintenanceNeed = Convert<C.MaintenanceNeed>(equipment.CalculateMaintenanceNeed(today, upcomingWindowDays)),
+                IsActive = equipment.IsActive,
+            })
+            .ToArray();
 
         return Task.FromResult(new PagedResult<C.EquipmentSummary>
         {
@@ -197,6 +206,77 @@ internal sealed class FakeInventoryQueries(FakeInventory inventory) : IInventory
             TotalCount = changes.Length,
         });
     }
+
+    public Task<PagedResult<C.AgentSummary>> SearchAgentsAsync(
+        C.AgentSearchQuery query, CancellationToken cancellationToken = default)
+    {
+        LastAgentSearch = query;
+
+        var items = inventory.Agents
+            .Where(agent => Matches(query.Activity, agent.IsActive))
+            .Select(agent => new C.AgentSummary
+            {
+                Id = agent.Id,
+                FullName = agent.FullName,
+                DisplayName = agent.DisplayName,
+                RegistrationNumber = agent.RegistrationNumber,
+                Role = Convert<C.AgentRole>(agent.Role),
+                Status = Convert<C.AgentStatus>(agent.Status),
+                IsActive = agent.IsActive,
+            })
+            .ToArray();
+
+        return Task.FromResult(new PagedResult<C.AgentSummary>
+        {
+            Items = items,
+            Page = query.Page,
+            PageSize = query.PageSize,
+            TotalCount = items.Length,
+        });
+    }
+
+    public Task<C.AgentDetails?> GetAgentDetailsAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(inventory.Agents.Where(agent => agent.Id == id).Select(agent =>
+        {
+            var organization = inventory.Organizations.Single(candidate => candidate.Id == agent.OrganizationId);
+            var operationalBase = inventory.Bases.Single(candidate => candidate.Id == agent.BaseId);
+            var assignment = inventory.Assignments.SingleOrDefault(candidate => candidate.IsOpen && candidate.AgentId == agent.Id);
+            return new C.AgentDetails
+            {
+                Id = agent.Id,
+                FullName = agent.FullName,
+                DisplayName = agent.DisplayName,
+                RegistrationNumber = agent.RegistrationNumber,
+                Role = Convert<C.AgentRole>(agent.Role),
+                Rank = agent.Rank,
+                OrganizationId = organization.Id,
+                OrganizationName = organization.Name,
+                OrganizationAcronym = organization.Acronym,
+                BaseId = operationalBase.Id,
+                BaseName = operationalBase.Name,
+                Status = Convert<C.AgentStatus>(agent.Status),
+                StatusChangedAt = agent.StatusChanges.Max(change => change.OccurredAt),
+                AssignedEquipment = assignment is null ? null : new C.AssignedEquipmentData
+                {
+                    AssignmentId = assignment.Id,
+                    EquipmentId = assignment.EquipmentId,
+                    StartedAt = assignment.StartedAt,
+                    StartedBy = assignment.StartedBy,
+                },
+                IsActive = agent.IsActive,
+                Version = inventory.AgentVersionOf(agent.Id),
+            };
+        }).SingleOrDefault());
+
+    public Task<bool> AgentExistsAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(inventory.Agents.Any(agent => agent.Id == id));
+
+    private static bool Matches(ActivityFilter activity, bool isActive) => activity switch
+    {
+        ActivityFilter.Active => isActive,
+        ActivityFilter.Inactive => !isActive,
+        _ => true,
+    };
 
     private static TTarget Convert<TTarget>(Enum value)
         where TTarget : struct, Enum => Enum.Parse<TTarget>(value.ToString());

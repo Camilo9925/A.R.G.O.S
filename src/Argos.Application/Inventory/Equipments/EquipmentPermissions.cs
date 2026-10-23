@@ -13,7 +13,10 @@ public static class EquipmentPermissions
     /// <summary>RN-05: reativar (Desativado → Operacional) exige <c>resources.reactivate</c>.</summary>
     public static bool CanReactivate(ICurrentActor actor) => Grants(actor, Permission.ResourceReactivate);
 
-    /// <summary>US-04: alterar a situação exige <c>resources.status.change</c>.</summary>
+    /// <summary>
+    /// US-04: alterar a situação exige <c>resources.status.change</c>. Vale também para a situação do agente (RN-12),
+    /// que usa a mesma política (plan 15.14).
+    /// </summary>
     public static bool CanChangeStatus(ICurrentActor actor) => Grants(actor, Permission.ResourceStatusChange);
 
     private static bool Grants(ICurrentActor actor, Permission permission)

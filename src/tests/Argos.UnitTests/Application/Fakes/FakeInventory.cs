@@ -1,11 +1,13 @@
 using Argos.Application.Common.Abstractions;
 using Argos.Application.Inventory;
+using Argos.Application.Inventory.Agents;
 using Argos.Application.Inventory.Equipments;
 using Argos.Application.Inventory.Geography;
 using Argos.Application.Inventory.Support;
 using Argos.Application.Inventory.Types;
 using Argos.Domain.Common.Parameters;
 using Argos.Domain.Inventory;
+using Argos.Domain.Inventory.Agents;
 using Argos.Domain.Inventory.Equipments;
 using Argos.Domain.Inventory.Geography;
 using Argos.Domain.Inventory.Support;
@@ -28,6 +30,8 @@ internal sealed class FakeInventory :
     IOperationalBaseRepository,
     IEquipmentTypeRepository,
     IEquipmentRepository,
+    IAgentRepository,
+    IAgentAssignmentRepository,
     IInventoryChangeLog,
     IBusinessParameters,
     ISeedLedger
@@ -48,10 +52,17 @@ internal sealed class FakeInventory :
 
     public List<Equipment> Equipment { get; } = [];
 
+    public List<Agent> Agents { get; } = [];
+
+    public List<AgentAssignment> Assignments { get; } = [];
+
     public List<InventoryChange> Changes { get; } = [];
 
     /// <summary>Versão de cada equipamento (D-60); 1 se o teste não definir outra.</summary>
     public Dictionary<Guid, uint> EquipmentVersions { get; } = [];
+
+    /// <summary>Versão de cada agente (D-60); 1 se o teste não definir outra.</summary>
+    public Dictionary<Guid, uint> AgentVersions { get; } = [];
 
     public Dictionary<BusinessParameter, int> Parameters { get; } = [];
 
@@ -163,6 +174,39 @@ internal sealed class FakeInventory :
     void IEquipmentRepository.Add(Equipment equipment) => Equipment.Add(equipment);
 
     public uint VersionOf(Guid equipmentId) => EquipmentVersions.GetValueOrDefault(equipmentId, 1u);
+
+    // Agentes
+
+    Task<Agent?> IAgentRepository.FindByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Agents.SingleOrDefault(agent => agent.Id == id));
+
+    Task<Guid?> IAgentRepository.FindIdByRegistrationAsync(
+        Guid organizationId, string registrationKey, CancellationToken cancellationToken) =>
+        Task.FromResult(Agents
+            .Where(agent => agent.OrganizationId == organizationId && agent.RegistrationKey == registrationKey)
+            .Select(agent => (Guid?)agent.Id)
+            .FirstOrDefault());
+
+    uint IAgentRepository.VersionOf(Agent agent) => AgentVersionOf(agent.Id);
+
+    void IAgentRepository.Add(Agent agent) => Agents.Add(agent);
+
+    public uint AgentVersionOf(Guid agentId) => AgentVersions.GetValueOrDefault(agentId, 1u);
+
+    // Vínculos
+
+    Task<AgentAssignment?> IAgentAssignmentRepository.FindByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Assignments.SingleOrDefault(assignment => assignment.Id == id));
+
+    Task<AgentAssignment?> IAgentAssignmentRepository.FindOpenByAgentAsync(Guid agentId, CancellationToken cancellationToken) =>
+        Task.FromResult(Assignments.SingleOrDefault(assignment => assignment.IsOpen && assignment.AgentId == agentId));
+
+    Task<IReadOnlyList<AgentAssignment>> IAgentAssignmentRepository.ListOpenByEquipmentAsync(
+        Guid equipmentId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<AgentAssignment>>(
+            Assignments.Where(assignment => assignment.IsOpen && assignment.EquipmentId == equipmentId).ToArray());
+
+    void IAgentAssignmentRepository.Add(AgentAssignment assignment) => Assignments.Add(assignment);
 
     // Registro cadastral
 

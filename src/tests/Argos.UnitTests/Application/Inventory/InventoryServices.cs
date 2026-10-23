@@ -1,7 +1,9 @@
 using Argos.Application.Inventory;
+using Argos.Application.Inventory.Agents;
 using Argos.Application.Inventory.Equipments;
 using Argos.Application.Inventory.Geography;
 using Argos.Application.Inventory.Support;
+using Argos.Application.Inventory.Timeline;
 using Argos.Application.Inventory.Types;
 using Argos.Domain.Access;
 using Argos.Domain.Inventory.Geography;
@@ -15,7 +17,8 @@ namespace Argos.UnitTests.Application.Inventory;
 /// <summary>
 /// Serviços do Inventário montados sobre o <see cref="FakeInventory"/>, com um cenário mínimo de Prometeia: o
 /// município quadrado de <see cref="InventoryTestData"/>, a região Centro, o bairro Jardim das Musas, o órgão SMM, a
-/// base Central de Mobilidade e os dez tipos do catálogo. O relógio marca <see cref="InventoryTestData.Now"/>.
+/// base Central de Mobilidade e os dez tipos do catálogo. O relógio marca <see cref="InventoryTestData.Now"/>. A linha
+/// do tempo devolve os fatos de <see cref="Timeline"/>.
 /// </summary>
 internal sealed class InventoryServices
 {
@@ -40,6 +43,8 @@ internal sealed class InventoryServices
     public FakeInventory Inventory { get; } = new();
 
     public FakeInventoryQueries Queries { get; }
+
+    public FakeTimelineQueries Timeline { get; } = new();
 
     public FakeCurrentActor Actor { get; } = new("admin", UserRole.Administrator);
 
@@ -93,4 +98,18 @@ internal sealed class InventoryServices
 
     public MaintenanceService MaintenanceService() =>
         new(Inventory, Calendar(), EquipmentQueryService(), UnitOfWork, Actor, Time);
+
+    public EquipmentInactivationService EquipmentInactivationService() =>
+        new(Inventory, Inventory, Inventory, UnitOfWork, Actor, Time);
+
+    public AgentQueryService AgentQueryService() => new(Queries, Actor);
+
+    public AgentService AgentService() =>
+        new(Inventory, Inventory, Inventory, Inventory, ReferenceNames(), AgentQueryService(), Inventory, UnitOfWork, Actor, Time);
+
+    public AgentStatusService AgentStatusService() => new(Inventory, AgentQueryService(), UnitOfWork, Actor, Time);
+
+    public AssignmentService AssignmentService() => new(Inventory, Inventory, Inventory, Inventory, UnitOfWork, Actor, Time);
+
+    public TimelineService TimelineService() => new(Timeline, Queries, Queries);
 }

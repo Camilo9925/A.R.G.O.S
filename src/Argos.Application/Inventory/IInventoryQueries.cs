@@ -40,7 +40,8 @@ public interface IInventoryQueries
     /// <summary>
     /// Pesquisa paginada (US-03; plan 15.8), com a necessidade de manutenção traduzida para o banco a partir do
     /// <paramref name="today"/> e da janela de manutenção próxima (D-54). A ordenação já chega conferida pela Aplicação
-    /// e é estável (desempate por id). Até a Fase 3, só os ativos.
+    /// e é estável (desempate por id). <see cref="EquipmentSearchQuery.Activity"/> escolhe ativos (padrão), inativos
+    /// ou todos (US-09, RN-35).
     /// </summary>
     Task<PagedResult<EquipmentSummary>> SearchEquipmentAsync(
         EquipmentSearchQuery query, DateOnly today, int upcomingWindowDays, CancellationToken cancellationToken = default);
@@ -48,7 +49,8 @@ public interface IInventoryQueries
     /// <summary>
     /// Dados de cadastro do equipamento, com nomes, localização, bairro e região, versão e auditoria. A Aplicação
     /// completa o que vem do Domínio: características, necessidade de manutenção, manutenções abertas e situações
-    /// permitidas (D-59). Nulo se o equipamento não existe.
+    /// permitidas (D-59). Traz também os agentes com vínculo aberto (US-07), por nome de exibição. Nulo se o
+    /// equipamento não existe.
     /// </summary>
     Task<EquipmentDetails?> GetEquipmentDetailsAsync(Guid id, CancellationToken cancellationToken = default);
 

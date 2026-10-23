@@ -15,7 +15,8 @@ namespace Argos.Application.Inventory.Equipments;
 /// <summary>
 /// Cadastro e edição de equipamentos (US-01, US-02, RF-001 a RF-007, RN-01, RN-22; plan 15.2.6, 15.12). Os erros de
 /// campo saem todos de uma vez, com o caminho do contrato (D-46); a duplicidade de marca e número de série aponta o
-/// equipamento existente (RN-01). A inativação entra na Fase 3 (T083).
+/// equipamento existente (RN-01), inclusive inativo. A inativação fica em <see cref="EquipmentInactivationService"/>,
+/// porque também encerra os vínculos de agentes (RN-35; D-62).
 /// </summary>
 public sealed class EquipmentService(
     IEquipmentRepository equipments,

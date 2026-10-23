@@ -431,5 +431,5 @@ FodyWeavers.xsd
 specs/
 assets/
 
-# Claude Code output styles (local only, not versioned)
-.claude/output-styles/
+# Claude Code local settings (not versioned)
+.claude/

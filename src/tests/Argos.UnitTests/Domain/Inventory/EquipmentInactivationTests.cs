@@ -40,7 +40,7 @@ public sealed class EquipmentInactivationTests
             var exception = Assert.Throws<InventoryRuleException>(() => equipment.Inactivate(null, Later, "admin"));
 
             Assert.Equal(
-                $"Equipamento {EquipmentStatusLabels.For(status)} não pode ser inativado. A inativação só é possível "
+                $"Equipamento na situação {EquipmentStatusLabels.For(status)} não pode ser inativado. A inativação só é possível "
                 + "nas situações Ainda não instalado, Desativado ou Furtado.",
                 exception.Message);
             Assert.True(equipment.IsActive);

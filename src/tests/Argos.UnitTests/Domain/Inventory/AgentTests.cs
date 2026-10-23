@@ -296,7 +296,7 @@ public sealed class AgentTests
             var exception = Assert.Throws<InventoryRuleException>(() => agent.Inactivate(null, Later, "admin"));
 
             Assert.Equal(
-                $"Agente {AgentStatusLabels.For(status)} não pode ser inativado. A inativação só é possível nas "
+                $"Agente na situação {AgentStatusLabels.For(status)} não pode ser inativado. A inativação só é possível nas "
                 + "situações Fora de serviço ou Afastado.",
                 exception.Message);
             Assert.True(agent.IsActive);

@@ -205,7 +205,7 @@ public sealed partial class Agent : IAuditable, IDeactivatable
         if (!InactivatableStatuses.Contains(Status))
         {
             throw new InventoryRuleException(
-                $"Agente {AgentStatusLabels.For(Status)} não pode ser inativado. A inativação só é possível nas "
+                $"Agente na situação {AgentStatusLabels.For(Status)} não pode ser inativado. A inativação só é possível nas "
                 + "situações Fora de serviço ou Afastado.");
         }
 

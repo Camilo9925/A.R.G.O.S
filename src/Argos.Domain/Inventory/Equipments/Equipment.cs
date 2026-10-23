@@ -447,7 +447,7 @@ public sealed class Equipment : IAuditable, IDeactivatable
         if (!InactivatableStatuses.Contains(Status))
         {
             throw new InventoryRuleException(
-                $"Equipamento {EquipmentStatusLabels.For(Status)} não pode ser inativado. A inativação só é possível nas "
+                $"Equipamento na situação {EquipmentStatusLabels.For(Status)} não pode ser inativado. A inativação só é possível nas "
                 + "situações Ainda não instalado, Desativado ou Furtado.");
         }
 

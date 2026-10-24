@@ -375,6 +375,34 @@ public sealed class AgentServicesTests
         Assert.Null(_services.Queries.LastAgentSearch);
     }
 
+    // Equipamentos vinculáveis (US-07, D-62, D-68)
+
+    [Fact]
+    public async Task AssignableEquipment_UnknownSortAndInvalidPage_AreRefusedTogether_US07_D68()
+    {
+        var exception = await Assert.ThrowsAsync<ValidationFailedException>(() => _services.AgentQueryService()
+            .SearchAssignableEquipmentAsync(new AssignableEquipmentQuery { Sort = AgentSortFields.DisplayName, Page = 0 }, Ct));
+
+        Assert.Equal(["page", "sort"], exception.Errors.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(
+            "Ordenação inválida. Use uma destas: serialNumber, type, status, neighborhood, updatedAt.",
+            Assert.Single(exception.Errors["sort"]));
+        Assert.Null(_services.Queries.LastAssignableSearch);
+    }
+
+    [Fact]
+    public async Task AssignableEquipment_WithoutSort_UsesSerialNumberAndTheMaintenanceCalendar_US07_D68()
+    {
+        _services.Inventory.Parameters[global::Argos.Domain.Common.Parameters.BusinessParameter.MaintenanceUpcomingWindowDays] = 10;
+
+        await _services.AgentQueryService().SearchAssignableEquipmentAsync(new AssignableEquipmentQuery { Search = "viatura" }, Ct);
+
+        var received = _services.Queries.LastAssignableSearch!;
+        Assert.Equal(EquipmentSortFields.SerialNumber, received.Sort);
+        Assert.Equal("viatura", received.Search);
+        Assert.Equal((EquipmentTestData.Today, 10), _services.Queries.LastSearchCalendar);
+    }
+
     // Vínculos (US-07, RF-016, D-62)
 
     [Fact]

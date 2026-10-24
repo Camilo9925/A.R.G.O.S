@@ -83,7 +83,7 @@ internal sealed class InventoryServices
     public OrganizationService OrganizationService() => new(Inventory, Queries, Inventory, UnitOfWork, Actor, Time);
 
     public OperationalBaseService OperationalBaseService() =>
-        new(Inventory, Inventory, Inventory, Locations(), ReferenceNames(), Queries, Inventory, UnitOfWork, Actor, Time);
+        new(Inventory, Inventory, Inventory, Inventory, Locations(), ReferenceNames(), Queries, Inventory, UnitOfWork, Actor, Time);
 
     public EquipmentTypeService EquipmentTypeService() => new(Queries);
 
@@ -102,7 +102,7 @@ internal sealed class InventoryServices
     public EquipmentInactivationService EquipmentInactivationService() =>
         new(Inventory, Inventory, Inventory, UnitOfWork, Actor, Time);
 
-    public AgentQueryService AgentQueryService() => new(Queries, Actor);
+    public AgentQueryService AgentQueryService() => new(Queries, Calendar(), Inventory, Actor);
 
     public AgentService AgentService() =>
         new(Inventory, Inventory, Inventory, Inventory, ReferenceNames(), AgentQueryService(), Inventory, UnitOfWork, Actor, Time);

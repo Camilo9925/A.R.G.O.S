@@ -1,5 +1,6 @@
 using Argos.Application.Common.Abstractions;
 using Argos.Application.Common.Exceptions;
+using Argos.Application.Inventory.Agents;
 using Argos.Application.Inventory.Equipments;
 using Argos.Contracts.Inventory;
 using Argos.Domain.Common;
@@ -17,6 +18,7 @@ public sealed class OperationalBaseService(
     IOperationalBaseRepository bases,
     IOrganizationRepository organizations,
     IEquipmentRepository equipments,
+    IAgentRepository agents,
     InventoryLocations locations,
     InventoryReferenceNames referenceNames,
     IInventoryQueries queries,
@@ -77,13 +79,18 @@ public sealed class OperationalBaseService(
         return await GetAsync(id, cancellationToken);
     }
 
-    /// <summary>Inativa a base, recusada se houver equipamento ativo nela (plan 15.2.3; agentes na Fase 3).</summary>
+    /// <summary>
+    /// Inativa a base, recusada se houver equipamento ou agente ativo nela, com a mesma mensagem do Domínio (RF-019,
+    /// A-19; D-57; plan 15.2.3).
+    /// </summary>
     public async Task InactivateAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var operationalBase = await FindAsync(id, cancellationToken);
         var now = timeProvider.GetUtcNow();
+        var hasActiveDependents = await equipments.AnyActiveInBaseAsync(id, cancellationToken)
+            || await agents.AnyActiveInBaseAsync(id, cancellationToken);
 
-        operationalBase.Inactivate(await equipments.AnyActiveInBaseAsync(id, cancellationToken), now, actor.Name);
+        operationalBase.Inactivate(hasActiveDependents, now, actor.Name);
         changeLog.Add(InventoryChange.Inactivated(InventoryEntityType.OperationalBase, id, null, now, actor.Name));
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }

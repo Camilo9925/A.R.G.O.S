@@ -15,7 +15,19 @@ internal static class PageValidation
     /// <summary>Confere a pesquisa e devolve a ordenação a usar (a padrão, se não informada).</summary>
     /// <exception cref="ValidationFailedException">Página, tamanho, ordenação ou filtro de ativos inválidos.</exception>
     public static string ValidateSearch(
-        PageQuery query, IReadOnlyList<string> sortFields, string defaultSort, ActivityFilter activity)
+        PageQuery query, IReadOnlyList<string> sortFields, string defaultSort, ActivityFilter activity) =>
+        Search(query, sortFields, defaultSort, activity);
+
+    /// <summary>
+    /// Confere uma pesquisa sem filtro de ativos (a dos equipamentos vinculáveis, D-68, em que só ativos entram) e
+    /// devolve a ordenação a usar.
+    /// </summary>
+    /// <exception cref="ValidationFailedException">Página, tamanho ou ordenação inválidos.</exception>
+    public static string ValidateSearch(PageQuery query, IReadOnlyList<string> sortFields, string defaultSort) =>
+        Search(query, sortFields, defaultSort, activity: null);
+
+    private static string Search(
+        PageQuery query, IReadOnlyList<string> sortFields, string defaultSort, ActivityFilter? activity)
     {
         var errors = PageErrors(query.Page, query.PageSize);
 
@@ -25,8 +37,10 @@ internal static class PageValidation
             errors["sort"] = [$"Ordenação inválida. Use uma destas: {string.Join(", ", sortFields)}."];
         }
 
-        // O binding da query string aceita números para enums; um valor fora da lista não pode virar "todos".
-        if (!Enum.IsDefined(activity))
+        // Na API, o binder do [ApiController] já recusa um número fora do enum com 400 antes de chegar aqui; esta
+        // conferência protege as chamadas que não passam pela API (plan 15.12, Pesquisas): um valor fora da lista não
+        // pode virar "todos".
+        if (activity is { } filter && !Enum.IsDefined(filter))
         {
             errors["activity"] = ["Filtro de ativos inválido. Use active, inactive ou all."];
         }

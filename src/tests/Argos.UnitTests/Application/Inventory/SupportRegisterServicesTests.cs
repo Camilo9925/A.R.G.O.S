@@ -5,6 +5,7 @@ using Argos.Domain.Inventory;
 using Argos.Domain.Inventory.Geography;
 using Argos.Domain.Inventory.Support;
 using Argos.UnitTests.Domain.Inventory;
+using DomainAgentRole = Argos.Domain.Inventory.Agents.AgentRole;
 
 namespace Argos.UnitTests.Application.Inventory;
 
@@ -254,6 +255,38 @@ public sealed class SupportRegisterServicesTests
         _services.Inventory.Equipment.Add(EquipmentTestData.NewPatrol(_services.Base, _services.Organization));
 
         await Assert.ThrowsAsync<InventoryRuleException>(() => _services.OperationalBaseService().InactivateAsync(_services.Base.Id, Ct));
+    }
+
+    [Fact]
+    public async Task InactivateBase_WithActiveAgentAndNoEquipment_IsRefusedWithTheDomainMessage_RF019()
+    {
+        _services.Inventory.Agents.Add(AgentTestData.NewAgent(
+            "AT-0001", _services.Organization, _services.Base, DomainAgentRole.TrafficAgent, rank: null));
+
+        var exception = await Assert.ThrowsAsync<InventoryRuleException>(
+            () => _services.OperationalBaseService().InactivateAsync(_services.Base.Id, Ct));
+
+        Assert.Equal("A base tem equipamentos ou agentes ativos e não pode ser inativada.", exception.Message);
+        Assert.True(_services.Base.IsActive);
+        Assert.Equal(0, _services.UnitOfWork.SaveCalls);
+        Assert.Empty(_services.Inventory.Changes);
+    }
+
+    [Fact]
+    public async Task InactivateBase_OnlyWithInactiveAgent_IsInactivated_RF019()
+    {
+        var agent = AgentTestData.NewAgent("AT-0002", _services.Organization, _services.Base, DomainAgentRole.TrafficAgent, rank: null);
+        agent.Inactivate("Desligado do órgão.", InventoryTestData.Now, "admin");
+        _services.Inventory.Agents.Add(agent);
+
+        await _services.OperationalBaseService().InactivateAsync(_services.Base.Id, Ct);
+
+        Assert.False(_services.Base.IsActive);
+        Assert.Equal(1, _services.UnitOfWork.SaveCalls);
+        var change = Assert.Single(_services.Inventory.Changes);
+        Assert.Equal(
+            (InventoryEntityType.OperationalBase, _services.Base.Id, InventoryChangeKind.Inactivated),
+            (change.EntityType, change.EntityId, change.Kind));
     }
 
     [Theory]

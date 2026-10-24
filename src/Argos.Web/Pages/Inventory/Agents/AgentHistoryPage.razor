@@ -1,0 +1,30 @@
+@page "/inventory/agents/{Id:guid}/history"
+
+@attribute [Authorize(Policy = Permissions.HistoryView)]
+@inject AgentClient Agents
+
+@*
+    Histórico completo do agente (US-08, RF-018; plan 15.15): situação, alterações de cadastro, vínculos e inativação.
+    Política history.view; a página usa só a linha do tempo, sem ler os detalhes (que o Operador não consulta). O link de
+    volta aos detalhes aparece só a quem tem inventory.view.
+*@
+<PageTitle>Histórico do agente · ARGOS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="mb-3">
+        <MudText Typo="Typo.h4" HtmlTag="h1">Histórico do agente</MudText>
+        <AuthorizeView Policy="@Permissions.InventoryView">
+            <MudButton Href="@($"inventory/agents/{Id}")" Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.ArrowBack">
+                Voltar aos detalhes
+            </MudButton>
+        </AuthorizeView>
+    </MudStack>
+
+    <TimelineView ResourceId="Id" Load="(page, size) => Agents.ListTimelineAsync(Id, page, size)" />
+</MudContainer>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+}

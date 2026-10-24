@@ -1,0 +1,31 @@
+@page "/inventory/equipment/{Id:guid}/history"
+
+@attribute [Authorize(Policy = Permissions.HistoryView)]
+@inject EquipmentClient Equipment
+
+@*
+    Histórico completo do equipamento (US-08, RF-011; plan 15.15): linha do tempo com situação, manutenções, alterações de
+    cadastro, inativação e vínculos. A política é history.view, que o Operador também tem; como ele não tem inventory.view,
+    a página não lê os detalhes (403) e usa só a linha do tempo. O link de volta aos detalhes aparece só a quem os consulta.
+    Convive com a aba "Histórico de situação" dos detalhes (Fase 2): a aba é o resumo rápido; esta página é o histórico completo.
+*@
+<PageTitle>Histórico do equipamento · ARGOS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="mb-3">
+        <MudText Typo="Typo.h4" HtmlTag="h1">Histórico do equipamento</MudText>
+        <AuthorizeView Policy="@Permissions.InventoryView">
+            <MudButton Href="@($"inventory/equipment/{Id}")" Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.ArrowBack">
+                Voltar aos detalhes
+            </MudButton>
+        </AuthorizeView>
+    </MudStack>
+
+    <TimelineView ResourceId="Id" Load="(page, size) => Equipment.ListTimelineAsync(Id, page, size)" />
+</MudContainer>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+}

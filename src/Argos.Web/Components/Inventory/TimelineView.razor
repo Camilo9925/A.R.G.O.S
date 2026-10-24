@@ -1,0 +1,146 @@
+@inject DisplayTime DisplayTime
+
+@*
+    Linha do tempo de um equipamento ou agente (US-08, RF-011, RF-018; plan 15.15). A API devolve as entradas já em
+    ordem (do mais recente ao mais antigo) e com título, descrição e detalhes prontos em pt-BR; a Web só exibe, com
+    ícone e texto do tipo (Art. X.2), data e hora no fuso de exibição e "Carregar mais".
+*@
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" role="alert">
+        @_error
+        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="ReloadAsync" Class="ml-2">
+            Tentar novamente
+        </MudButton>
+    </MudAlert>
+}
+else if (_entries is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-hidden="true" />
+    <MudText Typo="Typo.body2" Class="mt-2" role="status">Carregando o histórico…</MudText>
+}
+else if (_entries.Count == 0)
+{
+    <EmptyState Title="Nenhum registro no histórico" Icon="@Icons.Material.Outlined.History" />
+}
+else
+{
+    <MudTimeline TimelinePosition="TimelinePosition.End">
+        @foreach (var entry in _entries)
+        {
+            var (icon, color) = InventoryLabels.AppearanceFor(entry.Kind);
+            <MudTimelineItem Color="color" Size="Size.Small">
+                <ItemContent>
+                    <MudPaper Outlined="true" Class="pa-3">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudIcon Icon="@icon" Size="Size.Small" aria-hidden="true" />
+                            <MudText Typo="Typo.overline">@InventoryLabels.For(entry.Kind)</MudText>
+                        </MudStack>
+                        <MudText Typo="Typo.subtitle1"><strong>@entry.Title</strong></MudText>
+                        @if (!string.IsNullOrWhiteSpace(entry.Description))
+                        {
+                            <MudText Typo="Typo.body2">@entry.Description</MudText>
+                        }
+                        @if (entry.Details.Count > 0)
+                        {
+                            <dl class="argos-definition mt-2 mb-0">
+                                @foreach (var detail in entry.Details)
+                                {
+                                    <dt>@detail.Label</dt>
+                                    <dd class="mb-1">@detail.Value</dd>
+                                }
+                            </dl>
+                        }
+                        <MudText Typo="Typo.caption">@DisplayTime.FormatDateTime(entry.OccurredAt) · Autor: @entry.Author</MudText>
+                    </MudPaper>
+                </ItemContent>
+            </MudTimelineItem>
+        }
+    </MudTimeline>
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mt-2">
+        <MudText Typo="Typo.body2" role="status">@_entries.Count de @_total registro(s)</MudText>
+        @if (_entries.Count < _total)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadMoreAsync" Disabled="_loadingMore">
+                @(_loadingMore ? "Carregando…" : $"Carregar mais ({_total - _entries.Count} restantes)")
+            </MudButton>
+        }
+    </MudStack>
+    <SaveErrorAlert Message="@_moreError" />
+}
+
+@code {
+    private const int PageSize = 20;
+
+    private List<TimelineEntry>? _entries;
+    private int _total;
+    private int _page;
+    private string? _error;
+    private string? _moreError;
+    private bool _loadingMore;
+    private Guid _loadedFor;
+
+    /// <summary>Busca uma página da linha do tempo (equipamento ou agente) na API.</summary>
+    [Parameter, EditorRequired]
+    public Func<int, int, Task<PagedResult<TimelineEntry>>> Load { get; set; } = null!;
+
+    /// <summary>Id do recurso: ao mudar, a linha do tempo é recarregada.</summary>
+    [Parameter, EditorRequired]
+    public Guid ResourceId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedFor != ResourceId)
+        {
+            _loadedFor = ResourceId;
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        _error = null;
+        _entries = null;
+        try
+        {
+            var first = await Load(1, PageSize);
+            _entries = [.. first.Items];
+            _total = first.TotalCount;
+            _page = 1;
+        }
+        catch (ApiProblemException problem)
+        {
+            _error = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Verifique a conexão e tente novamente.";
+        }
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        _loadingMore = true;
+        _moreError = null;
+        try
+        {
+            var next = await Load(_page + 1, PageSize);
+            _entries!.AddRange(next.Items);
+            _total = next.TotalCount;
+            _page++;
+        }
+        catch (ApiProblemException problem)
+        {
+            _moreError = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _moreError = "Não foi possível carregar mais registros. Verifique a conexão e tente novamente.";
+        }
+        finally
+        {
+            _loadingMore = false;
+        }
+    }
+}

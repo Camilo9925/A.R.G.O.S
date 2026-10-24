@@ -10,7 +10,8 @@
 @*
     Detalhes do equipamento (US-04, US-05, RF-008, RF-009; plan 15.15). Necessidade de manutenção, situações permitidas
     e características vêm prontas da API (D-54, D-59). As ações aparecem só com a permissão correspondente, e a API
-    recusa de qualquer forma. Não existe opção de exclusão (RN-23).
+    recusa de qualquer forma. Cadastro inativo (US-09, RN-35) aparece como tal, sem as ações de edição, situação e
+    manutenção, e só "Inativar" confirma e deixa a API explicar a recusa (D-59). Não existe opção de exclusão (RN-23).
 *@
 <PageTitle>@(_details?.SerialNumber ?? "Equipamento") · ARGOS</PageTitle>
 
@@ -42,11 +43,15 @@
                 <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
                     <StatusBadge Status="details.Status" />
                     <MaintenanceNeedBadge Need="details.MaintenanceNeed" />
+                    @if (!details.IsActive)
+                    {
+                        <ActivityBadge IsActive="false" />
+                    }
                 </MudStack>
             </MudStack>
             <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
                 <AuthorizeView Policy="@Permissions.ResourceStatusChange">
-                    @if (details.AllowedStatusChanges.Count > 0)
+                    @if (details.IsActive && details.AllowedStatusChanges.Count > 0)
                     {
                         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapHoriz"
                                    OnClick="ChangeStatusAsync">
@@ -54,18 +59,33 @@
                         </MudButton>
                     }
                 </AuthorizeView>
-                <AuthorizeView Policy="@Permissions.InventoryManage">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Build"
-                               OnClick="RegisterMaintenanceAsync">
-                        Registrar manutenção
-                    </MudButton>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"
-                               Href="@($"inventory/equipment/{details.Id}/edit")">
-                        Editar
-                    </MudButton>
-                </AuthorizeView>
+                @if (details.IsActive)
+                {
+                    <AuthorizeView Policy="@Permissions.InventoryManage">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Build"
+                                   OnClick="RegisterMaintenanceAsync">
+                            Registrar manutenção
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"
+                                   Href="@($"inventory/equipment/{details.Id}/edit")">
+                            Editar
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Outlined.DoNotDisturbOn"
+                                   OnClick="InactivateAsync">
+                            Inativar
+                        </MudButton>
+                    </AuthorizeView>
+                }
             </MudStack>
         </MudStack>
+
+        @if (!details.IsActive)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3" role="status">
+                Este equipamento está inativo: não pode ser editado, mudar de situação nem receber manutenção. O cadastro e o
+                histórico continuam disponíveis para consulta.
+            </MudAlert>
+        }
 
         <MudText Typo="Typo.caption" Class="mb-3 d-block">
             Atualizado em @DisplayTime.FormatDateTime(details.UpdatedAt ?? details.CreatedAt)
@@ -160,10 +180,13 @@
                                         <td>@(maintenance.Description ?? InventoryLabels.For(maintenance.Origin))</td>
                                         <td>
                                             <AuthorizeView Policy="@Permissions.InventoryManage" Context="manage">
+                                                @if (details.IsActive)
+                                                {
                                                 <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
                                                            OnClick="() => CompleteMaintenanceAsync(maintenance)">
                                                     Concluir
                                                 </MudButton>
+                                                }
                                             </AuthorizeView>
                                         </td>
                                     </tr>
@@ -174,8 +197,42 @@
                 </MudPaper>
             </MudItem>
 
+            @if (details.AssignedAgents.Count > 0)
+            {
+                @* Só quem a API devolve: a lista vem vazia nos tipos que não recebem vínculo (US-07). *@
+                <MudItem xs="12">
+                    <MudPaper Outlined="true" Class="pa-4">
+                        <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-3">Agentes vinculados</MudText>
+                        <MudSimpleTable Dense="true" Outlined="true">
+                            <thead>
+                                <tr><th>Agente</th><th>Matrícula</th><th>Função</th><th>Situação</th><th>Vinculado em</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var agent in details.AssignedAgents)
+                                {
+                                    <tr>
+                                        <td><MudLink Href="@($"inventory/agents/{agent.AgentId}")">@agent.DisplayName</MudLink></td>
+                                        <td>@agent.RegistrationNumber</td>
+                                        <td>@InventoryLabels.For(agent.Role)</td>
+                                        <td><AgentStatusBadge Status="agent.Status" /></td>
+                                        <td>@DisplayTime.FormatDateTime(agent.StartedAt) · @agent.StartedBy</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    </MudPaper>
+                </MudItem>
+            }
+
             <MudItem xs="12">
                 <MudPaper Outlined="true" Class="pa-4">
+                    @if (_canSeeHistory)
+                    {
+                        <MudButton Href="@($"inventory/equipment/{details.Id}/history")" Variant="Variant.Text" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.History" Class="mb-2">
+                            Ver histórico completo
+                        </MudButton>
+                    }
                     <MudTabs Elevation="0" ApplyEffectsToContainer="true" TabPanelsClass="pt-3">
                         @* Condição no código, e não AuthorizeView: a aba precisa existir já na primeira renderização das abas. *@
                         @if (_canSeeHistory)
@@ -327,6 +384,25 @@
         if (await dialog.Result is { Canceled: false })
         {
             Snackbar.Add("Situação alterada.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task InactivateAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<InactivationDialog>(
+            "Inativar equipamento",
+            new DialogParameters<InactivationDialog>
+            {
+                { dialog => dialog.Title, "Inativar equipamento" },
+                { dialog => dialog.Question, $"Inativar o equipamento {_details!.SerialNumber} ({_details.TypeName})?" },
+                { dialog => dialog.Inactivate, request => Equipment.InactivateAsync(Id, request) },
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Equipamento inativado.", Severity.Success);
             await LoadAsync();
         }
     }

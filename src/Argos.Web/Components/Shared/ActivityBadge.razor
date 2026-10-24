@@ -1,0 +1,7 @@
+@* Cadastro ativo ou inativo (US-09, RN-35) com cor, ícone e texto (Art. X.2). *@
+<TokenBadge Token="ActivityTokens.For(IsActive)" />
+
+@code {
+    [Parameter, EditorRequired]
+    public bool IsActive { get; set; }
+}

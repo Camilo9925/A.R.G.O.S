@@ -1,0 +1,9 @@
+@using Argos.Contracts.Inventory
+
+@* Situação do agente (RN-12) com cor, ícone e texto (Art. X.2, XI.2). *@
+<TokenBadge Token="AgentStatusTokens.For(Status)" />
+
+@code {
+    [Parameter, EditorRequired]
+    public AgentStatus Status { get; set; }
+}

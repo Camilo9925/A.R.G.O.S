@@ -1,0 +1,299 @@
+@page "/inventory/agents/{Id:guid}"
+
+@attribute [Authorize(Policy = Permissions.InventoryView)]
+@inject AgentClient Agents
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject DisplayTime DisplayTime
+
+@*
+    Detalhes do agente (US-06, US-07, US-09, RF-013 a RF-016; plan 15.15). As situações permitidas vêm prontas da API
+    (RN-12, D-59). As ações aparecem só com a permissão correspondente, e a API recusa de qualquer forma (D-58).
+    Cadastro inativo (US-09, RN-35) aparece como tal, sem as ações de edição e de situação. Não existe opção de
+    exclusão (RN-23).
+*@
+<PageTitle>@(_details?.DisplayName ?? "Agente") · ARGOS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudBreadcrumbs Items="Breadcrumbs" Class="px-0 pt-0" />
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" role="alert">
+            @_error
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="LoadAsync" Class="ml-2">Tentar novamente</MudButton>
+        </MudAlert>
+    }
+    else if (_details is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-hidden="true" />
+        <MudText Typo="Typo.body2" Class="mt-2" role="status">Carregando o agente…</MudText>
+    }
+    else
+    {
+        var details = _details;
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="mb-3">
+            <MudStack Spacing="1">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Large" aria-hidden="true" />
+                    <MudText Typo="Typo.h4" HtmlTag="h1">@details.DisplayName</MudText>
+                </MudStack>
+                <MudText Typo="Typo.body1">
+                    @InventoryLabels.For(details.Role) · matrícula @details.RegistrationNumber · @details.OrganizationAcronym
+                </MudText>
+                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                    <AgentStatusBadge Status="details.Status" />
+                    @if (!details.IsActive)
+                    {
+                        <ActivityBadge IsActive="false" />
+                    }
+                </MudStack>
+            </MudStack>
+            <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                <AuthorizeView Policy="@Permissions.ResourceStatusChange">
+                    @if (details.IsActive && details.AllowedStatusChanges.Count > 0)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapHoriz"
+                                   OnClick="ChangeStatusAsync">
+                            Alterar situação
+                        </MudButton>
+                    }
+                </AuthorizeView>
+                @if (details.IsActive)
+                {
+                    <AuthorizeView Policy="@Permissions.InventoryManage">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"
+                                   Href="@($"inventory/agents/{details.Id}/edit")">
+                            Editar
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Outlined.DoNotDisturbOn"
+                                   OnClick="InactivateAsync">
+                            Inativar
+                        </MudButton>
+                    </AuthorizeView>
+                }
+            </MudStack>
+        </MudStack>
+
+        @if (!details.IsActive)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3" role="status">
+                Este agente está inativo: não pode ser editado nem mudar de situação. O cadastro e o histórico continuam
+                disponíveis para consulta.
+            </MudAlert>
+        }
+
+        <MudText Typo="Typo.caption" Class="mb-3 d-block">
+            Atualizado em @DisplayTime.FormatDateTime(details.UpdatedAt ?? details.CreatedAt)
+            por @(details.UpdatedBy ?? details.CreatedBy) · situação desde @DisplayTime.FormatDateTime(details.StatusChangedAt)
+        </MudText>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="6">
+                <MudPaper Outlined="true" Class="pa-4" Style="height: 100%">
+                    <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-3">Dados do cadastro</MudText>
+                    <dl class="argos-definition">
+                        <dt>Nome completo</dt>
+                        <dd>@details.FullName</dd>
+                        <dt>Nome de exibição</dt>
+                        <dd>@details.DisplayName</dd>
+                        <dt>Matrícula</dt>
+                        <dd>@details.RegistrationNumber</dd>
+                        <dt>Função</dt>
+                        <dd>@InventoryLabels.For(details.Role)</dd>
+                        <dt>Posto ou graduação</dt>
+                        <dd>@(string.IsNullOrWhiteSpace(details.Rank) ? "—" : details.Rank)</dd>
+                        <dt>Órgão</dt>
+                        <dd>@details.OrganizationAcronym · @details.OrganizationName</dd>
+                    </dl>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudPaper Outlined="true" Class="pa-4" Style="height: 100%">
+                    <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-3">Base de atuação</MudText>
+                    <dl class="argos-definition">
+                        <dt>Base</dt>
+                        <dd>@details.BaseName</dd>
+                        <dt>Bairro da base</dt>
+                        <dd>@details.NeighborhoodName</dd>
+                        <dt>Região</dt>
+                        <dd>@details.RegionName</dd>
+                    </dl>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Outlined="true" Class="pa-4">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="mb-3">
+                        <MudText Typo="Typo.h6" HtmlTag="h2">Equipamento vinculado</MudText>
+                        @if (details.IsActive)
+                        {
+                            <AuthorizeView Policy="@Permissions.InventoryManage">
+                                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Link"
+                                               OnClick="AssignAsync">
+                                        Vincular a equipamento
+                                    </MudButton>
+                                    @if (details.AssignedEquipment is not null)
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.LinkOff"
+                                                   OnClick="EndAssignmentAsync">
+                                            Encerrar vínculo
+                                        </MudButton>
+                                    }
+                                </MudStack>
+                            </AuthorizeView>
+                        }
+                    </MudStack>
+                    @if (details.AssignedEquipment is { } equipment)
+                    {
+                        <MudStack Spacing="1">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
+                                <EquipmentTypeIcon IconKey="@equipment.TypeIcon" Name="@equipment.TypeName" />
+                                <MudLink Href="@($"inventory/equipment/{equipment.EquipmentId}")">@equipment.SerialNumber</MudLink>
+                                <StatusBadge Status="equipment.Status" />
+                            </MudStack>
+                            <MudText Typo="Typo.body2">@equipment.Brand @equipment.Model</MudText>
+                            <MudText Typo="Typo.caption">
+                                Vinculado em @DisplayTime.FormatDateTime(equipment.StartedAt) por @equipment.StartedBy
+                            </MudText>
+                        </MudStack>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2">Nenhum equipamento vinculado.</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <AuthorizeView Policy="@Permissions.HistoryView">
+                <MudItem xs="12">
+                    <MudButton Href="@($"inventory/agents/{details.Id}/history")" Variant="Variant.Text" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.History">
+                        Ver histórico completo
+                    </MudButton>
+                </MudItem>
+            </AuthorizeView>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    private AgentDetails? _details;
+    private string? _error;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private List<BreadcrumbItem> Breadcrumbs =>
+    [
+        new("Agentes", "inventory/agents"),
+        new(_details?.DisplayName ?? "Agente", null, disabled: true),
+    ];
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            _details = await Agents.GetAsync(Id);
+        }
+        catch (ApiProblemException problem)
+        {
+            _error = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Verifique a conexão e tente novamente.";
+        }
+    }
+
+    private async Task ChangeStatusAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<AgentStatusChangeDialog>(
+            "Alterar situação",
+            new DialogParameters<AgentStatusChangeDialog>
+            {
+                { dialog => dialog.AgentId, Id },
+                { dialog => dialog.Current, _details!.Status },
+                { dialog => dialog.Options, _details!.AllowedStatusChanges },
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Situação alterada.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task AssignAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<AssignEquipmentDialog>(
+            "Vincular a equipamento",
+            new DialogParameters<AssignEquipmentDialog>
+            {
+                { dialog => dialog.AgentId, Id },
+                { dialog => dialog.AgentName, _details!.DisplayName },
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Vínculo registrado.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task EndAssignmentAsync()
+    {
+        var assigned = _details!.AssignedEquipment!;
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Encerrar vínculo",
+            $"Encerrar o vínculo de {_details.DisplayName} com {assigned.TypeName} {assigned.SerialNumber}? O vínculo fica registrado no histórico.",
+            yesText: "Encerrar vínculo",
+            cancelText: "Cancelar");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await Agents.EndAssignmentAsync(Id, assigned.AssignmentId);
+            Snackbar.Add("Vínculo encerrado.", Severity.Success);
+        }
+        catch (ApiProblemException problem)
+        {
+            Snackbar.Add(problem.Message, Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("Não foi possível falar com o servidor. Tente novamente.", Severity.Error);
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task InactivateAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<InactivationDialog>(
+            "Inativar agente",
+            new DialogParameters<InactivationDialog>
+            {
+                { dialog => dialog.Title, "Inativar agente" },
+                { dialog => dialog.Question, $"Inativar o agente {_details!.DisplayName} (matrícula {_details.RegistrationNumber})?" },
+                { dialog => dialog.Inactivate, request => Agents.InactivateAsync(Id, request) },
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Agente inativado.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+}

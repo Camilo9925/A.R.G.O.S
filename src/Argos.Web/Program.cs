@@ -59,6 +59,7 @@ builder.Services.AddScoped(services => new HttpClient(new AuthorizationMessageHa
 // Clientes tipados do Inventário sobre o mesmo HttpClient autenticado (plan 15.15).
 builder.Services.AddScoped<InventoryReferenceClient>();
 builder.Services.AddScoped<EquipmentClient>();
+builder.Services.AddScoped<AgentClient>();
 
 // Preenchimento rápido da tela de login, só quando o nginx do ambiente Demo habilita (D-41).
 builder.Services.AddSingleton(DemoLoginOptions.From(builder.Configuration));

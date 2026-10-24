@@ -45,10 +45,11 @@
                     <AuthorizeView Policy="@Permissions.OperationsView">
                         <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Radar">Central</MudNavLink>
                     </AuthorizeView>
-                    @* Grupo do Inventário (D-67): Equipamentos para quem consulta, Cadastros de apoio para quem cadastra. *@
+                    @* Grupo do Inventário (D-67): Equipamentos e Agentes para quem consulta, Cadastros de apoio para quem cadastra. *@
                     <AuthorizeView Policy="@Permissions.InventoryView">
                         <MudNavGroup Title="Inventário" Icon="@Icons.Material.Filled.Inventory2" Expanded="true">
                             <MudNavLink Href="inventory/equipment" Icon="@Icons.Material.Filled.Devices">Equipamentos</MudNavLink>
+                            <MudNavLink Href="inventory/agents" Icon="@Icons.Material.Filled.Groups">Agentes</MudNavLink>
                             <AuthorizeView Policy="@Permissions.InventoryManage" Context="manage">
                                 <MudNavLink Href="inventory/settings" Icon="@Icons.Material.Filled.Tune">Cadastros de apoio</MudNavLink>
                             </AuthorizeView>

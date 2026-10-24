@@ -1,0 +1,290 @@
+@page "/inventory/agents/new"
+@page "/inventory/agents/{Id:guid}/edit"
+
+@attribute [Authorize(Policy = Permissions.InventoryManage)]
+@inject AgentClient Agents
+@inject InventoryReferenceClient Reference
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+@*
+    Cadastro e edição de agente (US-06, RF-013, RF-014; plan 15.15). O formulário só coleta os dados mínimos da
+    operação (RN-25): a API valida e cada erro volta no próprio campo (D-46). O agente nasce Fora de serviço (RN-12):
+    a situação muda depois, pelos detalhes. Agente inativo não é editado (RN-35).
+*@
+<PageTitle>@Title · ARGOS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-4">
+    <MudBreadcrumbs Items="Breadcrumbs" Class="px-0 pt-0" />
+    <MudText Typo="Typo.h4" HtmlTag="h1" Class="mb-3">@Title</MudText>
+
+    @if (_loadError is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" role="alert">@_loadError</MudAlert>
+    }
+    else if (!_loaded)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-hidden="true" />
+        <MudText Typo="Typo.body2" Class="mt-2" role="status">Carregando o formulário…</MudText>
+    }
+    else
+    {
+        @if (_conflict)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-3" role="alert">
+                @_error
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="ReloadAsync" Class="ml-2">
+                    Recarregar os dados (descarta as suas alterações)
+                </MudButton>
+            </MudAlert>
+        }
+        else if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-3" role="alert">@_error</MudAlert>
+        }
+
+        <MudStack Spacing="3">
+            <MudPaper Outlined="true" Class="pa-4">
+                <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-1">Identificação</MudText>
+                <MudText Typo="Typo.body2" Class="mb-3">
+                    Só os dados necessários à operação são pedidos (RN-25).
+                    @if (!IsEdit)
+                    {
+                        <span>O agente é cadastrado como Fora de serviço.</span>
+                    }
+                </MudText>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="Form.FullName" Label="Nome completo" Variant="Variant.Outlined" Required="true"
+                                      MaxLength="150" Error="@_errors.Has("fullName")" ErrorText="@_errors.For("fullName")" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="Form.DisplayName" Label="Nome de exibição ou de guerra" Variant="Variant.Outlined"
+                                      Required="true" MaxLength="50" Error="@_errors.Has("displayName")"
+                                      ErrorText="@_errors.For("displayName")" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="Form.RegistrationNumber" Label="Matrícula" Variant="Variant.Outlined" Required="true"
+                                      MaxLength="20" HelperText="Única em cada órgão." Error="@_errors.Has("registrationNumber")"
+                                      ErrorText="@_errors.For("registrationNumber")" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="AgentRole?" @bind-Value="Form.Role" Label="Função" Variant="Variant.Outlined" Required="true"
+                                   AnchorOrigin="Origin.BottomCenter" Error="@_errors.Has("role")" ErrorText="@_errors.For("role")">
+                            @foreach (var role in Enum.GetValues<AgentRole>())
+                            {
+                                <MudSelectItem T="AgentRole?" Value="@role">@InventoryLabels.For(role)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="Form.Rank" Label="Posto ou graduação (quando aplicável)" Variant="Variant.Outlined"
+                                      MaxLength="50" Error="@_errors.Has("rank")" ErrorText="@_errors.For("rank")" />
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <MudPaper Outlined="true" Class="pa-4">
+                <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-3">Órgão e base de atuação</MudText>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="Guid?" @bind-Value="Form.OrganizationId" Label="Órgão" Variant="Variant.Outlined" Required="true"
+                                   AnchorOrigin="Origin.BottomCenter" Error="@_errors.Has("organizationId")"
+                                   ErrorText="@_errors.For("organizationId")">
+                            @foreach (var organization in _organizations)
+                            {
+                                <MudSelectItem T="Guid?" Value="@organization.Id">@organization.Acronym · @organization.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="Guid?" @bind-Value="Form.BaseId" Label="Base de atuação" Variant="Variant.Outlined" Required="true"
+                                   AnchorOrigin="Origin.BottomCenter" Error="@_errors.Has("baseId")" ErrorText="@_errors.For("baseId")"
+                                   HelperText="A região do agente é a do bairro da base.">
+                            @foreach (var operationalBase in _bases)
+                            {
+                                <MudSelectItem T="Guid?" Value="@operationalBase.Id">
+                                    @operationalBase.Name (@operationalBase.OrganizationAcronym) · @operationalBase.Location.NeighborhoodName
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
+                <MudButton Href="@CancelHref" Variant="Variant.Text">Cancelar</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_saving"
+                           StartIcon="@Icons.Material.Filled.Save">
+                    @(_saving ? "Salvando…" : IsEdit ? "Salvar alterações" : "Cadastrar agente")
+                </MudButton>
+            </MudStack>
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+    private static readonly string[] ShownFields =
+    [
+        "fullName", "displayName", "registrationNumber", "role", "rank", "organizationId", "baseId",
+    ];
+
+    private readonly FieldErrors _errors = new();
+    private readonly CreateAgentRequest _create = new();
+    private UpdateAgentRequest _update = new();
+    private List<OrganizationData> _organizations = [];
+    private List<OperationalBaseData> _bases = [];
+    private bool _loaded;
+    private bool _saving;
+    private bool _conflict;
+    private string? _error;
+    private string? _loadError;
+
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    private bool IsEdit => Id is not null;
+
+    private AgentRegistrationRequest Form => IsEdit ? _update : _create;
+
+    private string Title => IsEdit ? "Editar agente" : "Novo agente";
+
+    private string CancelHref => IsEdit ? $"inventory/agents/{Id}" : "inventory/agents";
+
+    private List<BreadcrumbItem> Breadcrumbs =>
+    [
+        new("Agentes", "inventory/agents"),
+        new(Title, null, disabled: true),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var organizations = Reference.ListOrganizationsAsync();
+            var bases = Reference.ListOperationalBasesAsync();
+            _organizations = [.. await organizations];
+            _bases = [.. await bases];
+
+            if (Id is { } id)
+            {
+                await LoadAgentAsync(id);
+            }
+
+            _loaded = true;
+        }
+        catch (ApiProblemException problem)
+        {
+            _loadError = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _loadError = "Não foi possível falar com o servidor. Recarregue a página para tentar de novo.";
+        }
+    }
+
+    /// <summary>Preenche a edição com o cadastro atual e a versão lida (D-60).</summary>
+    private async Task LoadAgentAsync(Guid id)
+    {
+        var details = await Agents.GetAsync(id);
+        if (!details.IsActive)
+        {
+            // Cadastro inativo não é editado (US-09, RN-35); a API recusaria de qualquer forma.
+            _loadError = $"O agente {details.DisplayName} está inativo e não pode ser editado.";
+            return;
+        }
+
+        _update = new UpdateAgentRequest
+        {
+            FullName = details.FullName,
+            DisplayName = details.DisplayName,
+            RegistrationNumber = details.RegistrationNumber,
+            Role = details.Role,
+            OrganizationId = details.OrganizationId,
+            Rank = details.Rank,
+            BaseId = details.BaseId,
+            Version = details.Version,
+        };
+
+        // Órgão e base inativados continuam aceitos para quem já os tinha: aparecem na lista com o nome lido.
+        if (_organizations.All(organization => organization.Id != details.OrganizationId))
+        {
+            _organizations.Add(new OrganizationData
+            {
+                Id = details.OrganizationId, Name = details.OrganizationName, Acronym = details.OrganizationAcronym,
+            });
+        }
+
+        if (_bases.All(operationalBase => operationalBase.Id != details.BaseId))
+        {
+            _bases.Add(new OperationalBaseData
+            {
+                Id = details.BaseId,
+                Name = details.BaseName,
+                OrganizationAcronym = details.OrganizationAcronym,
+                Location = new LocationData { NeighborhoodName = details.NeighborhoodName },
+            });
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        _conflict = false;
+        _error = null;
+        _errors.Clear();
+        try
+        {
+            await LoadAgentAsync(Id!.Value);
+        }
+        catch (ApiProblemException problem)
+        {
+            _loadError = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Tente novamente.";
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        _error = null;
+        _conflict = false;
+        _errors.Clear();
+
+        try
+        {
+            var saved = Id is { } id ? await Agents.UpdateAsync(id, _update) : await Agents.CreateAsync(_create);
+            Snackbar.Add(IsEdit ? "Alterações salvas." : "Agente cadastrado.", Severity.Success);
+            Navigation.NavigateTo($"inventory/agents/{saved.Id}");
+        }
+        catch (ApiProblemException problem) when (problem.IsValidation)
+        {
+            _errors.Load(problem.Errors);
+            var others = _errors.Except(ShownFields).ToArray();
+            _error = others.Length > 0
+                ? string.Join(" ", others)
+                : "Corrija os campos indicados e tente novamente.";
+        }
+        catch (ApiProblemException problem) when (problem.Status == System.Net.HttpStatusCode.Conflict)
+        {
+            // Matrícula repetida no órgão (US-06) ou versão antiga (D-60): a mensagem da API explica qual; na edição
+            // fica a opção de recarregar.
+            _conflict = IsEdit;
+            _error = problem.Message;
+        }
+        catch (ApiProblemException problem)
+        {
+            _error = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Seus dados continuam no formulário; tente novamente.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

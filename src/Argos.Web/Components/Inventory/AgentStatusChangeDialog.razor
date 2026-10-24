@@ -1,0 +1,69 @@
+@inject AgentClient Agents
+
+@*
+    Alterar situação do agente (RF-015, RN-12): só as opções que a API devolveu em allowedStatusChanges (D-59). A
+    mudança é livre e não pede justificativa; fica registrada com data, hora e autor.
+*@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Alterar situação</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body2">Situação atual: <AgentStatusBadge Status="Current" /></MudText>
+            <MudRadioGroup T="AgentStatus?" @bind-Value="_target" aria-label="Nova situação">
+                <MudStack Spacing="1">
+                    @foreach (var option in Options)
+                    {
+                        <MudRadio T="AgentStatus?" Value="@option" Color="Color.Primary">
+                            <AgentStatusBadge Status="option" />
+                        </MudRadio>
+                    }
+                </MudStack>
+            </MudRadioGroup>
+            @if (_errors.Has("status"))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Error" role="alert">@_errors.For("status")</MudText>
+            }
+            <SaveErrorAlert Message="@_error" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="@(_target is null || _saving)">
+            @(_saving ? "Salvando…" : "Confirmar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly FieldErrors _errors = new();
+    private AgentStatus? _target;
+    private string? _error;
+    private bool _saving;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public Guid AgentId { get; set; }
+
+    [Parameter, EditorRequired]
+    public AgentStatus Current { get; set; }
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<AgentStatus> Options { get; set; } = [];
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        (_error, var details) = await SaveForm.RunAsync(
+            _errors, ["status"], () => Agents.ChangeStatusAsync(AgentId, new ChangeAgentStatusRequest { Status = _target }));
+        _saving = false;
+
+        if (details is not null)
+        {
+            Dialog.Close(DialogResult.Ok(details));
+        }
+    }
+}

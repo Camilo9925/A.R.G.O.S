@@ -1,0 +1,27 @@
+@* Legenda das situações do agente e do cadastro ativo ou inativo (Art. X.2, XI.2). *@
+
+<MudExpansionPanels Elevation="0" Outlined="true" Class="mb-3">
+    <MudExpansionPanel Text="Legenda">
+        <MudStack Spacing="2">
+            <div>
+                <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mb-1">Situação do agente</MudText>
+                <div class="argos-legend">
+                    @foreach (var (_, token) in AgentStatusTokens.All)
+                    {
+                        <TokenBadge Token="token" />
+                    }
+                </div>
+            </div>
+            <div>
+                <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mb-1">Cadastro</MudText>
+                <div class="argos-legend">
+                    <TokenBadge Token="ActivityTokens.Active" />
+                    <TokenBadge Token="ActivityTokens.Inactive" />
+                </div>
+                <MudText Typo="Typo.caption">
+                    Cadastro inativo não é editado, não muda de situação e continua consultável com o filtro de inativos.
+                </MudText>
+            </div>
+        </MudStack>
+    </MudExpansionPanel>
+</MudExpansionPanels>

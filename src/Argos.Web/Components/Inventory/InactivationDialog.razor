@@ -1,0 +1,85 @@
+@*
+    Inativação de equipamento ou de agente (US-09, RN-35; plan 15.15): confirmação com motivo opcional. Quem decide se a
+    situação permite é a API: a recusa (409) aparece aqui, com a explicação de quando a inativação é possível (D-59).
+    Cadastro inativado não é excluído nem volta a ficar ativo (RN-23), e o diálogo diz isso antes de confirmar.
+*@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Title</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body1">@Question</MudText>
+            <MudText Typo="Typo.body2">
+                O cadastro continua consultável com o filtro de inativos, com todo o seu histórico, mas não poderá mais ser
+                editado, mudar de situação nem voltar a ficar ativo.
+            </MudText>
+            <MudTextField @bind-Value="_reason"
+                          Label="Motivo (opcional)"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          MaxLength="500"
+                          Error="@_errors.Has("reason")"
+                          ErrorText="@_errors.For("reason")" />
+            <SaveErrorAlert Message="@_error" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancelar</MudButton>
+        <MudButton Color="Color.Secondary" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="_saving"
+                   StartIcon="@Icons.Material.Outlined.DoNotDisturbOn">
+            @(_saving ? "Inativando…" : "Inativar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly FieldErrors _errors = new();
+    private string? _reason;
+    private string? _error;
+    private bool _saving;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Pergunta de confirmação, com o nome do cadastro.</summary>
+    [Parameter, EditorRequired]
+    public string Question { get; set; } = string.Empty;
+
+    /// <summary>Chamada à API do recurso (equipamento ou agente).</summary>
+    [Parameter, EditorRequired]
+    public Func<InactivationRequest, Task> Inactivate { get; set; } = null!;
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        _error = null;
+        _errors.Clear();
+
+        try
+        {
+            await Inactivate(new InactivationRequest { Reason = string.IsNullOrWhiteSpace(_reason) ? null : _reason.Trim() });
+            Dialog.Close(DialogResult.Ok(true));
+        }
+        catch (ApiProblemException problem) when (problem.IsValidation)
+        {
+            _errors.Load(problem.Errors);
+            _error = _errors.Except(["reason"]).FirstOrDefault();
+        }
+        catch (ApiProblemException problem)
+        {
+            _error = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Tente novamente.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

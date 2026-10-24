@@ -136,12 +136,9 @@
         </MudStack>
     };
 
-    private static readonly StatusToken Active = new("Ativo", "#2EBD59", Icons.Material.Filled.CheckCircle);
-    private static readonly StatusToken Inactive = new("Inativo", "#8A94A6", Icons.Material.Outlined.DoNotDisturbOn, IsOutlined: true);
-
     private RenderFragment ActiveChip(bool isActive) => __builder =>
     {
-        <TokenBadge Token="@(isActive ? Active : Inactive)" />
+        <ActivityBadge IsActive="isActive" />
     };
 
     private RenderFragment RowActions(bool isActive, string name, Func<Task> edit, Func<Task> inactivate) => __builder =>

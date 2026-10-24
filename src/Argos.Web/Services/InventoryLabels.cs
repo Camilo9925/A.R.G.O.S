@@ -55,6 +55,54 @@ public static class InventoryLabels
         _ => origin.ToString(),
     };
 
+    public static string For(TimelineEntryKind kind) => kind switch
+    {
+        TimelineEntryKind.Registered => "Cadastro",
+        TimelineEntryKind.StatusChanged => "Mudança de situação",
+        TimelineEntryKind.MaintenanceOpened => "Manutenção aberta",
+        TimelineEntryKind.MaintenanceCompleted => "Manutenção concluída",
+        TimelineEntryKind.MaintenanceCancelled => "Manutenção cancelada",
+        TimelineEntryKind.RegistrationUpdated => "Alteração de cadastro",
+        TimelineEntryKind.Inactivated => "Inativação",
+        TimelineEntryKind.CrewAssigned => "Vínculo iniciado",
+        TimelineEntryKind.CrewUnassigned => "Vínculo encerrado",
+        _ => kind.ToString(),
+    };
+
+    /// <summary>Ícone e cor do tipo de entrada da linha do tempo: o tipo nunca aparece só pela cor (Art. X.2).</summary>
+    public static (string Icon, Color Color) AppearanceFor(TimelineEntryKind kind) => kind switch
+    {
+        TimelineEntryKind.Registered => (Icons.Material.Filled.AddCircle, Color.Success),
+        TimelineEntryKind.StatusChanged => (Icons.Material.Filled.SwapHoriz, Color.Info),
+        TimelineEntryKind.MaintenanceOpened => (Icons.Material.Filled.Build, Color.Warning),
+        TimelineEntryKind.MaintenanceCompleted => (Icons.Material.Filled.TaskAlt, Color.Success),
+        TimelineEntryKind.MaintenanceCancelled => (Icons.Material.Filled.EventBusy, Color.Default),
+        TimelineEntryKind.RegistrationUpdated => (Icons.Material.Filled.Edit, Color.Primary),
+        TimelineEntryKind.Inactivated => (Icons.Material.Outlined.DoNotDisturbOn, Color.Secondary),
+        TimelineEntryKind.CrewAssigned => (Icons.Material.Filled.Link, Color.Tertiary),
+        TimelineEntryKind.CrewUnassigned => (Icons.Material.Filled.LinkOff, Color.Default),
+        _ => (Icons.Material.Filled.Circle, Color.Default),
+    };
+
+    public static string For(AgentRole role) => role switch
+    {
+        AgentRole.TrafficAgent => "Agente de trânsito",
+        AgentRole.MunicipalGuard => "Guarda municipal",
+        AgentRole.MilitaryPolice => "Policial militar",
+        _ => role.ToString(),
+    };
+
+    public static string For(AgentStatus status) => Theme.AgentStatusTokens.For(status).Label;
+
+    /// <summary>Filtro de cadastros ativos e inativos das listas (US-09).</summary>
+    public static string For(Argos.Contracts.Common.ActivityFilter activity) => activity switch
+    {
+        Argos.Contracts.Common.ActivityFilter.Active => "Ativos",
+        Argos.Contracts.Common.ActivityFilter.Inactive => "Inativos",
+        Argos.Contracts.Common.ActivityFilter.All => "Ativos e inativos",
+        _ => activity.ToString(),
+    };
+
     public static string For(EquipmentStatus status) => Theme.StatusTokens.For(status).Label;
 
     public static string For(MaintenanceNeed need) => Theme.MaintenanceNeedTokens.For(need).Label;

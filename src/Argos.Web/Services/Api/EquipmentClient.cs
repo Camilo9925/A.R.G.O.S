@@ -19,6 +19,7 @@ public sealed class EquipmentClient(HttpClient http) : ApiClient(http)
             .AddEach("neighborhoodId", query.NeighborhoodId)
             .AddEach("maintenanceNeed", query.MaintenanceNeed)
             .AddEach("category", query.Category)
+            .Add("activity", query.Activity.ToString().ToLowerInvariant())
             .Add("page", query.Page)
             .Add("pageSize", query.PageSize)
             .Add("sort", query.Sort)
@@ -44,6 +45,10 @@ public sealed class EquipmentClient(HttpClient http) : ApiClient(http)
         Guid id, ChangeEquipmentStatusRequest request, CancellationToken cancellationToken = default) =>
         SendAsync<EquipmentDetails>(HttpMethod.Post, $"{Base}/{id}/status-changes", request, cancellationToken);
 
+    /// <summary>Inativa o equipamento (US-09, RN-35); o <c>409</c> explica em que situações é possível. Sem exclusão (RN-23).</summary>
+    public Task InactivateAsync(Guid id, InactivationRequest request, CancellationToken cancellationToken = default) =>
+        SendAsync(HttpMethod.Post, $"{Base}/{id}/inactivation", request, cancellationToken);
+
     public Task<PagedResult<StatusChangeData>> ListStatusChangesAsync(
         Guid id, int page, int pageSize, CancellationToken cancellationToken = default) =>
         GetAsync<PagedResult<StatusChangeData>>(
@@ -60,4 +65,10 @@ public sealed class EquipmentClient(HttpClient http) : ApiClient(http)
         Guid id, Guid maintenanceId, CompleteMaintenanceRequest request, CancellationToken cancellationToken = default) =>
         SendAsync<MaintenanceCompletionData>(
             HttpMethod.Post, $"{Base}/{id}/maintenances/{maintenanceId}/completion", request, cancellationToken);
+
+    /// <summary>Linha do tempo do equipamento, do mais recente para o mais antigo (US-08, RF-011).</summary>
+    public Task<PagedResult<TimelineEntry>> ListTimelineAsync(
+        Guid id, int page, int pageSize, CancellationToken cancellationToken = default) =>
+        GetAsync<PagedResult<TimelineEntry>>(
+            $"{Base}/{id}/timeline{new QueryString().Add("page", page).Add("pageSize", pageSize)}", cancellationToken);
 }

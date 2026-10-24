@@ -95,6 +95,13 @@
                     <MudSelectItem T="EquipmentCategory" Value="@category">@InventoryLabels.For(category)</MudSelectItem>
                 }
             </MudSelect>
+            <MudSelect T="ActivityFilter" Value="CurrentActivity" ValueChanged="ActivityChangedAsync" Label="Cadastros"
+                       Variant="Variant.Outlined" Dense="true" ToStringFunc="@(activity => InventoryLabels.For(activity))">
+                @foreach (var activity in Enum.GetValues<ActivityFilter>())
+                {
+                    <MudSelectItem T="ActivityFilter" Value="@activity">@InventoryLabels.For(activity)</MudSelectItem>
+                }
+            </MudSelect>
         </div>
     </MudPaper>
 
@@ -152,7 +159,15 @@
                     <MudLink Href="@($"inventory/equipment/{context.Id}")">@context.SerialNumber</MudLink>
                 </MudTd>
                 <MudTd DataLabel="Marca e modelo">@context.Brand @context.Model</MudTd>
-                <MudTd DataLabel="Situação"><StatusBadge Status="context.Status" /></MudTd>
+                <MudTd DataLabel="Situação">
+                    <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                        <StatusBadge Status="context.Status" />
+                        @if (!context.IsActive)
+                        {
+                            <ActivityBadge IsActive="false" />
+                        }
+                    </MudStack>
+                </MudTd>
                 <MudTd DataLabel="Manutenção"><MaintenanceNeedBadge Need="context.MaintenanceNeed" /></MudTd>
                 <MudTd DataLabel="Órgão">@context.OrganizationAcronym</MudTd>
                 <MudTd DataLabel="Bairro">@context.NeighborhoodName <MudText Typo="Typo.caption" Inline="true">(@context.RegionName)</MudText></MudTd>
@@ -188,6 +203,7 @@
     private const string NeighborhoodKey = "neighborhoodId";
     private const string NeedKey = "maintenanceNeed";
     private const string CategoryKey = "category";
+    private const string ActivityKey = "activity";
     private const string PageKey = "page";
     private const string PageSizeKey = "pageSize";
     private const string SortKey = "sort";
@@ -212,10 +228,17 @@
     [SupplyParameterFromQuery(Name = NeighborhoodKey)] public Guid[]? NeighborhoodId { get; set; }
     [SupplyParameterFromQuery(Name = NeedKey)] public string[]? MaintenanceNeed { get; set; }
     [SupplyParameterFromQuery(Name = CategoryKey)] public string[]? Category { get; set; }
+    [SupplyParameterFromQuery(Name = ActivityKey)] public string? Activity { get; set; }
     [SupplyParameterFromQuery(Name = PageKey)] public int? Page { get; set; }
     [SupplyParameterFromQuery(Name = PageSizeKey)] public int? PageSize { get; set; }
     [SupplyParameterFromQuery(Name = SortKey)] public string? Sort { get; set; }
     [SupplyParameterFromQuery(Name = DirectionKey)] public string? Direction { get; set; }
+
+    /// <summary>Ativos por padrão (US-09); a URL só guarda o valor quando é diferente.</summary>
+    private ActivityFilter CurrentActivity =>
+        Enum.TryParse<ActivityFilter>(Activity, ignoreCase: true, out var activity) && Enum.IsDefined(activity)
+            ? activity
+            : ActivityFilter.Active;
 
     private int CurrentPageSize => PageSize is { } size && PageSizes.Contains(size) ? size : PageQuery.DefaultPageSize;
 
@@ -269,6 +292,7 @@
                 NeighborhoodId = [.. NeighborhoodId ?? []],
                 MaintenanceNeed = [.. Parsed<MaintenanceNeed>(MaintenanceNeed)],
                 Category = [.. Parsed<EquipmentCategory>(Category)],
+                Activity = CurrentActivity,
                 Page = Math.Max(1, Page ?? 1),
                 PageSize = CurrentPageSize,
                 Sort = CurrentSort,
@@ -310,6 +334,12 @@
             Add(NeighborhoodKey, NeighborhoodId,
                 id => $"Bairro: {_neighborhoods.FirstOrDefault(neighborhood => neighborhood.Id == id)?.Name ?? "…"}");
             Add(CategoryKey, Parsed<EquipmentCategory>(Category), category => InventoryLabels.For(category));
+            if (CurrentActivity != ActivityFilter.Active)
+            {
+                filters.Add(new ActiveFilter(
+                    ActivityKey, CurrentActivity.ToString().ToLowerInvariant(), $"Cadastros: {InventoryLabels.For(CurrentActivity)}"));
+            }
+
             return filters;
 
             void Add<T>(string key, IEnumerable<T>? values, Func<T, string> label)
@@ -343,6 +373,12 @@
             .OfType<T>()
             .ToArray();
 
+    private Task ActivityChangedAsync(ActivityFilter activity) =>
+        NavigateAsync(new Dictionary<string, object?>
+        {
+            [ActivityKey] = activity == ActivityFilter.Active ? null : activity.ToString().ToLowerInvariant(),
+        });
+
     private Task SearchChangedAsync(string? search) =>
         NavigateAsync(new Dictionary<string, object?> { [SearchKey] = string.IsNullOrWhiteSpace(search) ? null : search.Trim() });
 
@@ -374,7 +410,7 @@
         NavigateAsync(new Dictionary<string, object?>
         {
             [SearchKey] = null, [TypeKey] = null, [StatusKey] = null, [OrganizationKey] = null, [RegionKey] = null,
-            [NeighborhoodKey] = null, [NeedKey] = null, [CategoryKey] = null,
+            [NeighborhoodKey] = null, [NeedKey] = null, [CategoryKey] = null, [ActivityKey] = null,
         });
 
     private Task SortAsync(string field)

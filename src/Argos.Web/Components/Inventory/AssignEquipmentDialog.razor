@@ -1,0 +1,170 @@
+@inject AgentClient Agents
+
+@*
+    Vincular a equipamento (US-07, RF-016; D-62, D-68; plan 15.15). A lista é exatamente o que
+    GET …/agents/assignable-equipment devolve: a Web não filtra por tipo nem por situação (D-59, Art. III.4), só pesquisa
+    e pagina. Um vínculo aberto com outro equipamento é encerrado pela API. Recusas (409) aparecem aqui, no diálogo.
+*@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Vincular a equipamento</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.body2">Agente: <strong>@AgentName</strong></MudText>
+            <MudTextField T="string"
+                          Value="_search"
+                          ValueChanged="SearchChangedAsync"
+                          DebounceInterval="400"
+                          Immediate="true"
+                          Label="Pesquisar equipamento"
+                          Placeholder="Número de série, marca, modelo ou bairro"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Clearable="true" />
+            <SaveErrorAlert Message="@_assignError" />
+
+            @if (_loadError is not null)
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" role="alert">
+                    @_loadError
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="() => LoadAsync(_page)" Class="ml-2">
+                        Tentar novamente
+                    </MudButton>
+                </MudAlert>
+            }
+            else if (_result is null)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-hidden="true" />
+                <MudText Typo="Typo.body2" role="status">Carregando equipamentos…</MudText>
+            }
+            else if (_result.TotalCount == 0)
+            {
+                <EmptyState Title="@(string.IsNullOrWhiteSpace(_search) ? "Nenhum equipamento disponível para vínculo" : "Nenhum equipamento encontrado")"
+                            Description="@(string.IsNullOrWhiteSpace(_search) ? "Não há equipamento que aceite vínculo no momento." : "Nenhum equipamento vinculável atende à pesquisa. Altere ou limpe o termo.")" />
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" role="status">
+                    @_result.TotalCount equipamento(s) · página @_result.Page de @PageCount
+                </MudText>
+                <MudTable Items="_result.Items" Dense="true" Hover="true" Outlined="true" Loading="_loading"
+                          Breakpoint="Breakpoint.Sm" T="EquipmentSummary">
+                    <HeaderContent>
+                        <MudTh>Tipo</MudTh>
+                        <MudTh>Número de série</MudTh>
+                        <MudTh>Modelo</MudTh>
+                        <MudTh>Órgão</MudTh>
+                        <MudTh>Bairro</MudTh>
+                        <MudTh>Situação</MudTh>
+                        <MudTh><span class="mud-sr-only">Ação</span></MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Tipo"><EquipmentTypeIcon IconKey="@context.TypeIcon" Name="@context.TypeName" /></MudTd>
+                        <MudTd DataLabel="Número de série">@context.SerialNumber</MudTd>
+                        <MudTd DataLabel="Modelo">@context.Brand @context.Model</MudTd>
+                        <MudTd DataLabel="Órgão">@context.OrganizationAcronym</MudTd>
+                        <MudTd DataLabel="Bairro">@context.NeighborhoodName</MudTd>
+                        <MudTd DataLabel="Situação"><StatusBadge Status="context.Status" /></MudTd>
+                        <MudTd>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" Disabled="_saving"
+                                       OnClick="() => AssignAsync(context)"
+                                       aria-label="@($"Vincular a {context.SerialNumber}")">
+                                Vincular
+                            </MudButton>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+                <MudPagination Count="PageCount" Selected="_result.Page" SelectedChanged="LoadAsync" Color="Color.Primary"
+                               ShowFirstButton="true" ShowLastButton="true" Class="d-flex justify-center" />
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancelar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private string? _search;
+    private PagedResult<EquipmentSummary>? _result;
+    private string? _loadError;
+    private string? _assignError;
+    private int _page = 1;
+    private bool _loading;
+    private bool _saving;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public Guid AgentId { get; set; }
+
+    [Parameter, EditorRequired]
+    public string AgentName { get; set; } = string.Empty;
+
+    private int PageCount => _result is null ? 1 : Math.Max(1, (int)Math.Ceiling(_result.TotalCount / (double)_result.PageSize));
+
+    protected override Task OnInitializedAsync() => LoadAsync(1);
+
+    private Task SearchChangedAsync(string? search)
+    {
+        _search = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+        return LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int page)
+    {
+        _page = page;
+        _loading = true;
+        _loadError = null;
+
+        try
+        {
+            _result = await Agents.SearchAssignableEquipmentAsync(new AssignableEquipmentQuery
+            {
+                Search = _search,
+                Page = page,
+                PageSize = PageQuery.DefaultPageSize,
+                Sort = EquipmentSortFields.Default,
+            });
+        }
+        catch (ApiProblemException problem)
+        {
+            _loadError = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _loadError = "Não foi possível falar com o servidor. Verifique a conexão e tente novamente.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task AssignAsync(EquipmentSummary equipment)
+    {
+        _saving = true;
+        _assignError = null;
+
+        try
+        {
+            var assignment = await Agents.AssignAsync(AgentId, new AssignEquipmentRequest { EquipmentId = equipment.Id });
+            Dialog.Close(DialogResult.Ok(assignment));
+        }
+        catch (ApiProblemException problem)
+        {
+            _assignError = problem.IsValidation ? string.Join(" ", problem.Errors.Values.SelectMany(messages => messages)) : problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _assignError = "Não foi possível falar com o servidor. Tente novamente.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

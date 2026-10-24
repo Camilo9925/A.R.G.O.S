@@ -252,6 +252,13 @@
     private async Task LoadEquipmentAsync(Guid id)
     {
         var details = await Equipment.GetAsync(id);
+        if (!details.IsActive)
+        {
+            // Cadastro inativo não é editado (US-09, RN-35); a API recusaria de qualquer forma.
+            _loadError = $"O equipamento {details.SerialNumber} está inativo e não pode ser editado.";
+            return;
+        }
+
         _type = _types.FirstOrDefault(type => type.Id == details.TypeId);
         _update = new UpdateEquipmentRequest
         {

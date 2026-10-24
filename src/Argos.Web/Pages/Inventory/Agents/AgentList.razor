@@ -1,0 +1,422 @@
+@page "/inventory/agents"
+
+@attribute [Authorize(Policy = Permissions.InventoryView)]
+@inject AgentClient Agents
+@inject InventoryReferenceClient Reference
+@inject NavigationManager Navigation
+@inject DisplayTime DisplayTime
+@using SortDirection = Argos.Contracts.Common.SortDirection
+
+@*
+    Lista de agentes (US-06, RF-017; plan 15.15). Como na lista de equipamentos, pesquisa, filtros, página e ordenação
+    ficam na URL, a única fonte do estado: cada mudança navega e a lista é recarregada da API, que filtra, ordena e
+    pagina. Ativos por padrão; o filtro de cadastros traz os inativos (US-09).
+*@
+<PageTitle>Agentes · ARGOS</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3" Wrap="Wrap.Wrap">
+        <MudText Typo="Typo.h4" HtmlTag="h1">Agentes</MudText>
+        <AuthorizeView Policy="@Permissions.InventoryManage">
+            <MudButton Href="inventory/agents/new" Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add">
+                Novo agente
+            </MudButton>
+        </AuthorizeView>
+    </MudStack>
+
+    <MudPaper Outlined="true" Class="pa-3 mb-3">
+        <MudTextField T="string"
+                      Value="Search"
+                      ValueChanged="SearchChangedAsync"
+                      DebounceInterval="400"
+                      Immediate="true"
+                      Label="Pesquisar"
+                      Placeholder="Nome, nome de exibição ou matrícula"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Clearable="true"
+                      Class="mb-3" />
+        <div class="argos-filters">
+            <MudSelect T="AgentRole" MultiSelection="true" Label="Função" Variant="Variant.Outlined" Dense="true"
+                       SelectedValues="Parsed<AgentRole>(Role)" SelectedValuesChanged="values => FilterAsync(RoleKey, values)"
+                       ToStringFunc="@(role => InventoryLabels.For(role))">
+                @foreach (var role in Enum.GetValues<AgentRole>())
+                {
+                    <MudSelectItem T="AgentRole" Value="@role">@InventoryLabels.For(role)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="Guid" MultiSelection="true" Label="Órgão" Variant="Variant.Outlined" Dense="true"
+                       SelectedValues="Selected(OrganizationId)" SelectedValuesChanged="values => FilterAsync(OrganizationKey, values)"
+                       ToStringFunc="@(id => _organizations.FirstOrDefault(organization => organization.Id == id)?.Acronym ?? string.Empty)">
+                @foreach (var organization in _organizations)
+                {
+                    <MudSelectItem T="Guid" Value="@organization.Id">@organization.Acronym · @organization.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="Guid" MultiSelection="true" Label="Base" Variant="Variant.Outlined" Dense="true"
+                       SelectedValues="Selected(BaseId)" SelectedValuesChanged="values => FilterAsync(BaseKey, values)"
+                       ToStringFunc="@(id => _bases.FirstOrDefault(operationalBase => operationalBase.Id == id)?.Name ?? string.Empty)">
+                @foreach (var operationalBase in _bases)
+                {
+                    <MudSelectItem T="Guid" Value="@operationalBase.Id">@operationalBase.Name (@operationalBase.OrganizationAcronym)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="Guid" MultiSelection="true" Label="Região" Variant="Variant.Outlined" Dense="true"
+                       SelectedValues="Selected(RegionId)" SelectedValuesChanged="values => FilterAsync(RegionKey, values)"
+                       ToStringFunc="@(id => _regions.FirstOrDefault(region => region.Id == id)?.Name ?? string.Empty)">
+                @foreach (var region in _regions)
+                {
+                    <MudSelectItem T="Guid" Value="@region.Id">@region.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="AgentStatus" MultiSelection="true" Label="Situação" Variant="Variant.Outlined" Dense="true"
+                       SelectedValues="Parsed<AgentStatus>(Status)" SelectedValuesChanged="values => FilterAsync(StatusKey, values)"
+                       ToStringFunc="@(status => InventoryLabels.For(status))">
+                @foreach (var (status, _) in AgentStatusTokens.All)
+                {
+                    <MudSelectItem T="AgentStatus" Value="@status">@InventoryLabels.For(status)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="ActivityFilter" Value="CurrentActivity" ValueChanged="ActivityChangedAsync" Label="Cadastros"
+                       Variant="Variant.Outlined" Dense="true" ToStringFunc="@(activity => InventoryLabels.For(activity))">
+                @foreach (var activity in Enum.GetValues<ActivityFilter>())
+                {
+                    <MudSelectItem T="ActivityFilter" Value="@activity">@InventoryLabels.For(activity)</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+    </MudPaper>
+
+    <ActiveFiltersBar Filters="ActiveFilters" OnRemove="RemoveFilterAsync" OnClear="ClearFiltersAsync" />
+    <AgentLegend />
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" role="alert" Class="mb-3">
+            @_error
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="LoadAsync" Class="ml-2">
+                Tentar novamente
+            </MudButton>
+        </MudAlert>
+    }
+    else if (_result is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-hidden="true" />
+        <MudText Typo="Typo.body2" Class="mt-2" role="status">Carregando agentes…</MudText>
+    }
+    else if (_result.TotalCount == 0)
+    {
+        @if (ActiveFilters.Count > 0)
+        {
+            <EmptyState Title="Nenhum agente encontrado"
+                        Description="Nenhum agente atende a todos os filtros aplicados. Remova algum filtro ou limpe todos.">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FilterAltOff"
+                           OnClick="ClearFiltersAsync">
+                    Limpar filtros
+                </MudButton>
+            </EmptyState>
+        }
+        else
+        {
+            <EmptyState Title="Nenhum agente cadastrado" Icon="@Icons.Material.Outlined.Groups" />
+        }
+    }
+    else
+    {
+        <MudTable Items="_result.Items" Hover="true" Dense="true" Outlined="true" Loading="_loading"
+                  Breakpoint="Breakpoint.Sm" T="AgentSummary">
+            <HeaderContent>
+                <MudTh>@SortHeader("Nome de exibição", AgentSortFields.DisplayName)</MudTh>
+                <MudTh>@SortHeader("Matrícula", AgentSortFields.RegistrationNumber)</MudTh>
+                <MudTh>Função</MudTh>
+                <MudTh>Órgão</MudTh>
+                <MudTh>Base</MudTh>
+                <MudTh>Região</MudTh>
+                <MudTh>@SortHeader("Situação", AgentSortFields.Status)</MudTh>
+                <MudTh>Atualizado em</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Nome de exibição">
+                    <MudLink Href="@($"inventory/agents/{context.Id}")">@context.DisplayName</MudLink>
+                    <MudText Typo="Typo.caption" Class="d-block">@context.FullName</MudText>
+                </MudTd>
+                <MudTd DataLabel="Matrícula">@context.RegistrationNumber</MudTd>
+                <MudTd DataLabel="Função">
+                    @InventoryLabels.For(context.Role)
+                    @if (!string.IsNullOrWhiteSpace(context.Rank))
+                    {
+                        <MudText Typo="Typo.caption" Class="d-block">@context.Rank</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Órgão">@context.OrganizationAcronym</MudTd>
+                <MudTd DataLabel="Base">@context.BaseName</MudTd>
+                <MudTd DataLabel="Região">@context.RegionName</MudTd>
+                <MudTd DataLabel="Situação">
+                    <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                        <AgentStatusBadge Status="context.Status" />
+                        @if (!context.IsActive)
+                        {
+                            <ActivityBadge IsActive="false" />
+                        }
+                    </MudStack>
+                </MudTd>
+                <MudTd DataLabel="Atualizado em">@DisplayTime.FormatDateTime(context.UpdatedAt)</MudTd>
+            </RowTemplate>
+        </MudTable>
+
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mt-3" Wrap="Wrap.Wrap">
+            <MudText Typo="Typo.body2" role="status">
+                @_result.TotalCount agente(s) · página @_result.Page de @PageCount
+            </MudText>
+            <MudStack Row="true" AlignItems="AlignItems.Center">
+                <MudSelect T="int" Value="CurrentPageSize" ValueChanged="PageSizeChangedAsync" Label="Por página"
+                           Variant="Variant.Outlined" Dense="true" Style="width: 7rem">
+                    @foreach (var size in PageSizes)
+                    {
+                        <MudSelectItem T="int" Value="size">@size</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudPagination Count="PageCount" Selected="_result.Page" SelectedChanged="PageChangedAsync"
+                               Color="Color.Primary" ShowFirstButton="true" ShowLastButton="true" />
+            </MudStack>
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+    private const string SearchKey = "search";
+    private const string RoleKey = "role";
+    private const string OrganizationKey = "organizationId";
+    private const string BaseKey = "baseId";
+    private const string RegionKey = "regionId";
+    private const string StatusKey = "status";
+    private const string ActivityKey = "activity";
+    private const string PageKey = "page";
+    private const string PageSizeKey = "pageSize";
+    private const string SortKey = "sort";
+    private const string DirectionKey = "direction";
+
+    private static readonly int[] PageSizes = [10, 25, 50, 100];
+
+    private IReadOnlyList<OrganizationData> _organizations = [];
+    private IReadOnlyList<OperationalBaseData> _bases = [];
+    private IReadOnlyList<RegionData> _regions = [];
+    private PagedResult<AgentSummary>? _result;
+    private string? _error;
+    private bool _loading;
+    private string? _loadedUri;
+
+    [SupplyParameterFromQuery(Name = SearchKey)] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = RoleKey)] public string[]? Role { get; set; }
+    [SupplyParameterFromQuery(Name = OrganizationKey)] public Guid[]? OrganizationId { get; set; }
+    [SupplyParameterFromQuery(Name = BaseKey)] public Guid[]? BaseId { get; set; }
+    [SupplyParameterFromQuery(Name = RegionKey)] public Guid[]? RegionId { get; set; }
+    [SupplyParameterFromQuery(Name = StatusKey)] public string[]? Status { get; set; }
+    [SupplyParameterFromQuery(Name = ActivityKey)] public string? Activity { get; set; }
+    [SupplyParameterFromQuery(Name = PageKey)] public int? Page { get; set; }
+    [SupplyParameterFromQuery(Name = PageSizeKey)] public int? PageSize { get; set; }
+    [SupplyParameterFromQuery(Name = SortKey)] public string? Sort { get; set; }
+    [SupplyParameterFromQuery(Name = DirectionKey)] public string? Direction { get; set; }
+
+    /// <summary>Ativos por padrão (US-09); a URL só guarda o valor quando é diferente.</summary>
+    private ActivityFilter CurrentActivity =>
+        Enum.TryParse<ActivityFilter>(Activity, ignoreCase: true, out var activity) && Enum.IsDefined(activity)
+            ? activity
+            : ActivityFilter.Active;
+
+    private int CurrentPageSize => PageSize is { } size && PageSizes.Contains(size) ? size : PageQuery.DefaultPageSize;
+
+    private string CurrentSort => Sort is { } sort && AgentSortFields.All.Contains(sort) ? sort : AgentSortFields.Default;
+
+    private SortDirection CurrentDirection =>
+        Enum.TryParse<SortDirection>(Direction, ignoreCase: true, out var direction) ? direction : SortDirection.Asc;
+
+    private int PageCount => _result is null ? 1 : Math.Max(1, (int)Math.Ceiling(_result.TotalCount / (double)_result.PageSize));
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Com os inativos: um agente inativo pode ter órgão, base ou região inativados, e o filtro precisa nomeá-los.
+            var organizations = Reference.ListOrganizationsAsync(includeInactive: true);
+            var bases = Reference.ListOperationalBasesAsync(includeInactive: true);
+            var regions = Reference.ListRegionsAsync(includeInactive: true);
+            (_organizations, _bases, _regions) = (await organizations, await bases, await regions);
+        }
+        catch (Exception exception) when (exception is ApiProblemException or HttpRequestException)
+        {
+            _error = "Não foi possível carregar as listas dos filtros. Tente novamente.";
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // A URL mudou (filtro, página, ordenação, voltar do navegador): recarrega uma vez por URL.
+        if (Navigation.Uri != _loadedUri)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loadedUri = Navigation.Uri;
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            _result = await Agents.SearchAsync(new AgentSearchQuery
+            {
+                Search = Search,
+                Role = [.. Parsed<AgentRole>(Role)],
+                OrganizationId = [.. OrganizationId ?? []],
+                BaseId = [.. BaseId ?? []],
+                RegionId = [.. RegionId ?? []],
+                Status = [.. Parsed<AgentStatus>(Status)],
+                Activity = CurrentActivity,
+                Page = Math.Max(1, Page ?? 1),
+                PageSize = CurrentPageSize,
+                Sort = CurrentSort,
+                Direction = CurrentDirection,
+            });
+        }
+        catch (ApiProblemException problem)
+        {
+            _error = problem.IsValidation
+                ? "Os filtros da URL são inválidos. Limpe os filtros e tente de novo."
+                : problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Verifique a conexão e tente novamente.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private IReadOnlyList<ActiveFilter> ActiveFilters
+    {
+        get
+        {
+            var filters = new List<ActiveFilter>();
+            if (!string.IsNullOrWhiteSpace(Search))
+            {
+                filters.Add(new ActiveFilter(SearchKey, Search, $"Pesquisa: {Search}"));
+            }
+
+            Add(RoleKey, Parsed<AgentRole>(Role), role => $"Função: {InventoryLabels.For(role)}");
+            Add(OrganizationKey, OrganizationId,
+                id => $"Órgão: {_organizations.FirstOrDefault(organization => organization.Id == id)?.Acronym ?? "…"}");
+            Add(BaseKey, BaseId, id => $"Base: {_bases.FirstOrDefault(operationalBase => operationalBase.Id == id)?.Name ?? "…"}");
+            Add(RegionKey, RegionId, id => $"Região: {_regions.FirstOrDefault(region => region.Id == id)?.Name ?? "…"}");
+            Add(StatusKey, Parsed<AgentStatus>(Status), status => $"Situação: {InventoryLabels.For(status)}");
+            if (CurrentActivity != ActivityFilter.Active)
+            {
+                filters.Add(new ActiveFilter(
+                    ActivityKey, CurrentActivity.ToString().ToLowerInvariant(), $"Cadastros: {InventoryLabels.For(CurrentActivity)}"));
+            }
+
+            return filters;
+
+            void Add<T>(string key, IEnumerable<T>? values, Func<T, string> label)
+            {
+                foreach (var value in values ?? [])
+                {
+                    filters.Add(new ActiveFilter(key, value!.ToString()!, label(value)));
+                }
+            }
+        }
+    }
+
+    private RenderFragment SortHeader(string label, string field) => __builder =>
+    {
+        var active = CurrentSort == field;
+        var icon = !active
+            ? Icons.Material.Filled.UnfoldMore
+            : CurrentDirection == SortDirection.Asc ? Icons.Material.Filled.ArrowUpward : Icons.Material.Filled.ArrowDownward;
+        <MudButton Variant="Variant.Text" Size="Size.Small" EndIcon="@icon" OnClick="() => SortAsync(field)" Class="argos-sort"
+                   aria-label="@($"Ordenar por {label.ToLowerInvariant()}")"
+                   aria-sort="@(active ? (CurrentDirection == SortDirection.Asc ? "ascending" : "descending") : "none")">
+            @label
+        </MudButton>
+    };
+
+    private static IReadOnlyCollection<Guid> Selected(Guid[]? values) => values ?? [];
+
+    private static IReadOnlyCollection<T> Parsed<T>(string[]? values)
+        where T : struct, Enum =>
+        (values ?? []).Select(value => Enum.TryParse<T>(value, ignoreCase: true, out var parsed) ? (T?)parsed : null)
+            .OfType<T>()
+            .ToArray();
+
+    private Task SearchChangedAsync(string? search) =>
+        NavigateAsync(new Dictionary<string, object?> { [SearchKey] = string.IsNullOrWhiteSpace(search) ? null : search.Trim() });
+
+    private Task ActivityChangedAsync(ActivityFilter activity) =>
+        NavigateAsync(new Dictionary<string, object?>
+        {
+            [ActivityKey] = activity == ActivityFilter.Active ? null : activity.ToString().ToLowerInvariant(),
+        });
+
+    private Task FilterAsync<T>(string key, IEnumerable<T>? values) =>
+        NavigateAsync(new Dictionary<string, object?>
+        {
+            [key] = values?.Select(value => value!.ToString()).ToArray() is { Length: > 0 } array ? array : null,
+        });
+
+    private Task RemoveFilterAsync(ActiveFilter filter)
+    {
+        if (filter.Key == SearchKey)
+        {
+            return SearchChangedAsync(null);
+        }
+
+        var remaining = new Uri(Navigation.Uri).Query.TrimStart('?')
+            .Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Select(pair => pair.Split('=', 2))
+            .Where(pair => Uri.UnescapeDataString(pair[0]) == filter.Key)
+            .Select(pair => Uri.UnescapeDataString(pair.ElementAtOrDefault(1) ?? string.Empty))
+            .Where(value => !string.Equals(value, filter.Value, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        return NavigateAsync(new Dictionary<string, object?> { [filter.Key] = remaining.Length > 0 ? remaining : null });
+    }
+
+    private Task ClearFiltersAsync() =>
+        NavigateAsync(new Dictionary<string, object?>
+        {
+            [SearchKey] = null, [RoleKey] = null, [OrganizationKey] = null, [BaseKey] = null, [RegionKey] = null,
+            [StatusKey] = null, [ActivityKey] = null,
+        });
+
+    private Task SortAsync(string field)
+    {
+        var direction = CurrentSort == field && CurrentDirection == SortDirection.Asc ? SortDirection.Desc : SortDirection.Asc;
+        return NavigateAsync(
+            new Dictionary<string, object?> { [SortKey] = field, [DirectionKey] = direction.ToString().ToLowerInvariant() },
+            resetPage: false);
+    }
+
+    private Task PageChangedAsync(int page) =>
+        NavigateAsync(new Dictionary<string, object?> { [PageKey] = page }, resetPage: false);
+
+    private Task PageSizeChangedAsync(int size) =>
+        NavigateAsync(new Dictionary<string, object?> { [PageSizeKey] = size });
+
+    /// <summary>Aplica a mudança à URL; mudar filtros volta para a primeira página.</summary>
+    private Task NavigateAsync(Dictionary<string, object?> changes, bool resetPage = true)
+    {
+        if (resetPage)
+        {
+            changes[PageKey] = null;
+        }
+
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(changes));
+        return Task.CompletedTask;
+    }
+}

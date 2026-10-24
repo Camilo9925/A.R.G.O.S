@@ -1,3 +1,4 @@
+using Argos.Domain.Inventory.Agents;
 using Argos.Domain.Inventory.Equipments;
 
 namespace Argos.Application.Seeding.Inventory;
@@ -72,6 +73,51 @@ public sealed record PeriodicMaintenanceSeed(int DueInDays, int PeriodicityDays,
 
 /// <summary>Mudança de situação feita antes da âncora (RN-05), com a justificativa quando a RN-06 a exige.</summary>
 public sealed record StatusChangeSeed(EquipmentStatus Target, TimeSpan BeforeAnchor, string? Justification);
+
+/// <summary>
+/// Versão <c>inventory-agents-v1</c> (Fase 3): os agentes, todos Fora de serviço, e os vínculos com motos e viaturas
+/// (plan 15.11.3). Agente e equipamento são identificados pelas chaves de negócio: órgão + matrícula (US-06) e marca +
+/// número de série (RN-01).
+/// </summary>
+public sealed record AgentCatalogSeed(IReadOnlyList<AgentSeed> Agents, IReadOnlyList<AssignmentSeed> Assignments);
+
+/// <summary>Um agente (RF-014, RN-25: só os dados mínimos), cadastrado antes da âncora.</summary>
+/// <param name="BaseName">Nome da base de atuação, do órgão do agente.</param>
+/// <param name="RegisteredBeforeAnchor">Quanto antes da âncora o agente foi cadastrado.</param>
+public sealed record AgentSeed(
+    string FullName,
+    string DisplayName,
+    string RegistrationNumber,
+    AgentRole Role,
+    string OrganizationAcronym,
+    string? Rank,
+    string BaseName,
+    TimeSpan RegisteredBeforeAnchor);
+
+/// <summary>Vínculo de um agente com uma moto ou viatura (US-07), iniciado antes da âncora.</summary>
+public sealed record AssignmentSeed(
+    string AgentOrganizationAcronym,
+    string AgentRegistrationNumber,
+    string EquipmentBrand,
+    string EquipmentSerialNumber,
+    TimeSpan StartedBeforeAnchor);
+
+/// <summary>Versão <c>inventory-inactivations-v1</c> (Fase 3): as inativações de demonstração (US-09, RN-35).</summary>
+public sealed record InactivationSeed(
+    IReadOnlyList<EquipmentInactivationSeed> Equipment, IReadOnlyList<AgentInactivationSeed> Agents);
+
+/// <summary>Inativação de um equipamento Desativado ou Furtado do catálogo, nunca moto nem viatura (D-62).</summary>
+public sealed record EquipmentInactivationSeed(string Brand, string SerialNumber, string Reason, TimeSpan BeforeAnchor);
+
+/// <summary>Agente que passa a Afastado e, depois, é inativado (RN-12, RN-35).</summary>
+/// <param name="OnLeaveBeforeAnchor">Quando passou a Afastado; antes da inativação.</param>
+/// <param name="InactivatedBeforeAnchor">Quando foi inativado.</param>
+public sealed record AgentInactivationSeed(
+    string OrganizationAcronym,
+    string RegistrationNumber,
+    string Reason,
+    TimeSpan OnLeaveBeforeAnchor,
+    TimeSpan InactivatedBeforeAnchor);
 
 /// <summary>Resultado de uma versão da carga: aplicada agora, com as quantidades, ou já aplicada antes.</summary>
 public sealed record SeedResult(string Version, bool AlreadyApplied, IReadOnlyDictionary<string, int> Counts)

@@ -11,6 +11,12 @@ public static class InventorySeed
     /// <summary>Equipamentos, situações e manutenções.</summary>
     public const string CatalogVersion = "inventory-catalog-v1";
 
+    /// <summary>Fase 3: agentes e vínculos com motos e viaturas.</summary>
+    public const string AgentsVersion = "inventory-agents-v1";
+
+    /// <summary>Fase 3: inativações de demonstração de equipamentos e agentes (RN-35), depois dos agentes.</summary>
+    public const string InactivationsVersion = "inventory-inactivations-v1";
+
     /// <summary>
     /// Autor dos registros de negócio da carga, para que o histórico mostre que são simulados (Art. IX.2; D-56). A
     /// auditoria técnica continua com o autor do processo (<c>sistema</c>, D-43).

@@ -1,9 +1,11 @@
 using Argos.Application.Access;
 using Argos.Application.Diagnostics;
 using Argos.Application.Inventory;
+using Argos.Application.Inventory.Agents;
 using Argos.Application.Inventory.Equipments;
 using Argos.Application.Inventory.Geography;
 using Argos.Application.Inventory.Support;
+using Argos.Application.Inventory.Timeline;
 using Argos.Application.Inventory.Types;
 using Argos.Application.Seeding;
 using Argos.Application.Seeding.Inventory;
@@ -37,10 +39,20 @@ public static class DependencyInjection
         services.AddScoped<EquipmentStatusService>();
         services.AddScoped<MaintenanceService>();
 
+        // Fase 3 (plan 15.12): entram com as implementações das portas dos agentes, dos vínculos e da linha do tempo.
+        services.AddScoped<EquipmentInactivationService>();
+        services.AddScoped<AgentQueryService>();
+        services.AddScoped<AgentService>();
+        services.AddScoped<AgentStatusService>();
+        services.AddScoped<AssignmentService>();
+        services.AddScoped<TimelineService>();
+
         // Carga inicial (plan 15.10, 15.11.4).
         services.AddScoped<BusinessParameterProvisioningService>();
         services.AddScoped<InventoryReferenceSeeder>();
         services.AddScoped<EquipmentCatalogSeeder>();
+        services.AddScoped<AgentCatalogSeeder>();
+        services.AddScoped<InactivationSeeder>();
 
         return services;
     }

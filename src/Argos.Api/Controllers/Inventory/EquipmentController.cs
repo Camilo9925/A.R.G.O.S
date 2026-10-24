@@ -1,16 +1,18 @@
 using Argos.Application.Inventory.Equipments;
+using Argos.Application.Inventory.Timeline;
 using Argos.Contracts.Access;
 using Argos.Contracts.Common;
 using Argos.Contracts.Inventory;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace Argos.Api.Controllers.Inventory;
 
 /// <summary>
 /// Equipamentos (US-01 a US-04, RF-001 a RF-010; plan 15.14): pesquisa e detalhes com <c>inventory.view</c>, cadastro e
-/// edição com <c>inventory.manage</c>, situação com <c>resources.status.change</c> e histórico de situação com
-/// <c>history.view</c> (D-58). Nenhuma ação <c>DELETE</c> (RN-23); a inativação chega na Fase 3 (US-09).
+/// edição e inativação com <c>inventory.manage</c>, situação com <c>resources.status.change</c>, histórico de situação
+/// e linha do tempo com <c>history.view</c> (D-58). Nenhuma ação <c>DELETE</c> (RN-23): o cadastro é inativado (US-09).
 /// </summary>
 [ApiController]
 [Route("api/inventory/equipment")]
@@ -19,12 +21,14 @@ namespace Argos.Api.Controllers.Inventory;
 public sealed class EquipmentController(
     EquipmentQueryService queries,
     EquipmentService equipment,
-    EquipmentStatusService statuses) : ControllerBase
+    EquipmentStatusService statuses,
+    EquipmentInactivationService inactivation,
+    TimelineService timeline) : ControllerBase
 {
     /// <summary>
     /// Pesquisa paginada (US-03). Um filtro aceita vários valores repetindo o parâmetro
     /// (<c>status=Malfunction&amp;status=Stolen</c>): valores do mesmo filtro combinam por "ou"; filtros diferentes,
-    /// por "e".
+    /// por "e". <c>activity</c> separa ativos (padrão), inativos e todos (US-09, RF-010).
     /// </summary>
     [HttpGet]
     [Authorize(Policy = Permissions.InventoryView)]
@@ -105,4 +109,38 @@ public sealed class EquipmentController(
     public async Task<ActionResult<PagedResult<StatusChangeData>>> ListStatusChanges(
         Guid id, [FromQuery] PageQuery paging, CancellationToken cancellationToken) =>
         Ok(await queries.ListStatusChangesAsync(id, paging, cancellationToken));
+
+    /// <summary>
+    /// Inativação (US-09): só em Desativado, Furtado ou Ainda não instalado; fora delas, ou já inativo, 409 com o
+    /// motivo (RN-35). Encerra os vínculos com agentes e cancela as manutenções abertas, tudo no histórico. O corpo é
+    /// opcional (<c>reason</c> até 500 caracteres, 400 acima disso). Não existe exclusão (RN-23).
+    /// </summary>
+    [HttpPost("{id:guid}/inactivation")]
+    [Authorize(Policy = Permissions.InventoryManage)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> Inactivate(
+        Guid id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] InactivationRequest? request,
+        CancellationToken cancellationToken)
+    {
+        await inactivation.InactivateAsync(id, request ?? new InactivationRequest(), cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Linha do tempo (US-08, RF-011): situação, manutenções, alterações de cadastro e vínculos, do mais recente para
+    /// o mais antigo, paginada por <c>page</c> e <c>pageSize</c>; a ordem é fixa. O parâmetro não se chama
+    /// <c>page</c>, pelo mesmo motivo do histórico de situação.
+    /// </summary>
+    [HttpGet("{id:guid}/timeline")]
+    [Authorize(Policy = Permissions.HistoryView)]
+    [ProducesResponseType<PagedResult<TimelineEntry>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<PagedResult<TimelineEntry>>> ListTimeline(
+        Guid id, [FromQuery] PageQuery paging, CancellationToken cancellationToken) =>
+        Ok(await timeline.ForEquipmentAsync(id, paging, cancellationToken));
 }

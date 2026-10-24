@@ -10,6 +10,8 @@ internal static class InventoryHttp
 {
     public const string Equipment = "api/inventory/equipment";
 
+    public const string Agents = "api/inventory/agents";
+
     /// <summary>Cadastra pelo <c>POST</c> e confere o 201.</summary>
     public static async Task<EquipmentDetails> CreateEquipmentAsync(
         this HttpClient client, CreateEquipmentRequest request, CancellationToken cancellationToken)
@@ -37,6 +39,37 @@ internal static class InventoryHttp
             cancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return await response.ReadAsync<EquipmentDetails>(cancellationToken);
+    }
+
+    /// <summary>Cadastra o agente pelo <c>POST</c> e confere o 201 (US-06).</summary>
+    public static async Task<AgentDetails> CreateAgentAsync(
+        this HttpClient client, CreateAgentRequest request, CancellationToken cancellationToken)
+    {
+        var response = await client.PostJsonAsync(Agents, request, cancellationToken);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return await response.ReadAsync<AgentDetails>(cancellationToken);
+    }
+
+    public static async Task<AgentDetails> GetAgentAsync(this HttpClient client, Guid id, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync($"{Agents}/{id}", cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.ReadAsync<AgentDetails>(cancellationToken);
+    }
+
+    /// <summary>Pede o vínculo pelo <c>POST …/assignments</c> e devolve a resposta, sem conferir o código (US-07).</summary>
+    public static Task<HttpResponseMessage> AssignAsync(
+        this HttpClient client, Guid agentId, Guid equipmentId, CancellationToken cancellationToken) =>
+        client.PostJsonAsync(
+            $"{Agents}/{agentId}/assignments", new AssignEquipmentRequest { EquipmentId = equipmentId }, cancellationToken);
+
+    /// <summary>Muda a situação do agente pelo <c>POST …/status-changes</c> e confere o 200 (RN-12).</summary>
+    public static async Task ChangeAgentStatusAsync(
+        this HttpClient client, Guid agentId, AgentStatus status, CancellationToken cancellationToken)
+    {
+        var response = await client.PostJsonAsync(
+            $"{Agents}/{agentId}/status-changes", new ChangeAgentStatusRequest { Status = status }, cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     /// <summary>Hoje no fuso do município, a mesma data que a API usa nas manutenções (D-54).</summary>

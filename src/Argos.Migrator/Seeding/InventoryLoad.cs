@@ -12,7 +12,8 @@ namespace Argos.Migrator.Seeding;
 
 /// <summary>
 /// Carga do Inventário pelo Migrator (D-55, D-56; plan 15.10, 15.11.4), depois das migrations e do registro de
-/// fundação: parâmetros de negócio (a cada execução, só os que faltam), referência e catálogo de equipamentos. Cada
+/// fundação: parâmetros de negócio (a cada execução, só os que faltam), referência, catálogo de equipamentos e, na
+/// Fase 3, agentes com vínculos e inativações de demonstração, que entram num volume da Fase 2 sem <c>down -v</c>. Cada
 /// etapa roda num escopo próprio e grava num só <c>SaveChanges</c>, junto com o seu registro no histórico do seed; uma
 /// falha no meio não deixa linhas nem registro daquela versão.
 /// </summary>
@@ -36,6 +37,7 @@ internal static class InventoryLoad
         var anchor = simulation.AnchorDate ?? timeProvider.GetUtcNow();
         var geography = PrometeiaGeography.Load();
         var catalog = InventoryCatalogGenerator.Generate(simulation.Seed, geography);
+        var agents = AgentCatalogGenerator.Generate(simulation.Seed, catalog);
 
         await using (var scope = services.CreateAsyncScope())
         {
@@ -51,6 +53,20 @@ internal static class InventoryLoad
         {
             var result = await scope.ServiceProvider.GetRequiredService<EquipmentCatalogSeeder>().SeedAsync(
                 InventorySeedInput.Catalog(catalog), simulation.Seed, anchor, cancellationToken);
+            Log(logger, result, simulation.Seed);
+        }
+
+        await using (var scope = services.CreateAsyncScope())
+        {
+            var result = await scope.ServiceProvider.GetRequiredService<AgentCatalogSeeder>().SeedAsync(
+                InventorySeedInput.Agents(agents), simulation.Seed, anchor, cancellationToken);
+            Log(logger, result, simulation.Seed);
+        }
+
+        await using (var scope = services.CreateAsyncScope())
+        {
+            var result = await scope.ServiceProvider.GetRequiredService<InactivationSeeder>().SeedAsync(
+                InventorySeedInput.Inactivations(agents), simulation.Seed, anchor, cancellationToken);
             Log(logger, result, simulation.Seed);
         }
 
@@ -91,10 +107,20 @@ internal static class InventoryLoad
             return;
         }
 
-        logger.LogInformation(
-            "Carga {Version} aplicada com a semente {Seed}: {Counts}.",
-            result.Version,
-            seed,
-            string.Join(", ", result.Counts.Select(count => $"{count.Key}={count.Value}")));
+        var counts = string.Join(", ", result.Counts.Select(count => $"{count.Key}={count.Value}"));
+
+        // Um item pulado ("*Skipped") só acontece num volume alterado depois da semente: a carga segue, mas avisa.
+        if (result.Counts.Any(count => count.Key.EndsWith("Skipped", StringComparison.Ordinal) && count.Value > 0))
+        {
+            logger.LogWarning(
+                "Carga {Version} aplicada com a semente {Seed}, com itens pulados: {Counts}. O volume foi alterado " +
+                "depois da semente; docker compose down -v recria o estado da semente.",
+                result.Version,
+                seed,
+                counts);
+            return;
+        }
+
+        logger.LogInformation("Carga {Version} aplicada com a semente {Seed}: {Counts}.", result.Version, seed, counts);
     }
 }

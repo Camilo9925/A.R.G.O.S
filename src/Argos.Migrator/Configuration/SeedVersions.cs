@@ -15,4 +15,10 @@ internal static class SeedVersions
 
     /// <summary>Fase 2: equipamentos, situações e manutenções (D-56).</summary>
     public const string InventoryCatalog = InventorySeed.CatalogVersion;
+
+    /// <summary>Fase 3: agentes e vínculos com motos e viaturas (D-56).</summary>
+    public const string InventoryAgents = InventorySeed.AgentsVersion;
+
+    /// <summary>Fase 3: inativações de demonstração (RN-35; D-56).</summary>
+    public const string InventoryInactivations = InventorySeed.InactivationsVersion;
 }

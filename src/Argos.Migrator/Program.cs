@@ -42,6 +42,8 @@ builder.Services.AddScoped<DemoUserProvisioningService>();
 builder.Services.AddScoped<BusinessParameterProvisioningService>();
 builder.Services.AddScoped<InventoryReferenceSeeder>();
 builder.Services.AddScoped<EquipmentCatalogSeeder>();
+builder.Services.AddScoped<AgentCatalogSeeder>();
+builder.Services.AddScoped<InactivationSeeder>();
 
 using var host = builder.Build();
 
@@ -67,7 +69,7 @@ try
         logger.LogInformation("Seed {Version} com a semente {Seed} já estava aplicado; nada a fazer.", SeedVersions.Foundation, simulation.Seed);
     }
 
-    // Parâmetros de negócio, referência e catálogo do Inventário (plan 15.11.4).
+    // Parâmetros de negócio, referência, catálogo, agentes e inativações do Inventário (plan 15.11.4).
     if (!await InventoryLoad.RunAsync(
         host.Services, builder.Configuration, simulation, host.Services.GetRequiredService<TimeProvider>(), logger))
     {

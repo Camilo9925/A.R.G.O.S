@@ -1,4 +1,5 @@
 using Argos.Application.Seeding.Inventory;
+using Argos.Domain.Inventory.Agents;
 using Argos.Domain.Inventory.Equipments;
 using Argos.Simulation.Geography;
 using Argos.Simulation.Models;
@@ -65,6 +66,52 @@ internal static class InventorySeedInput
                     ? new StatusChangeSeed(Status(change.Target), change.BeforeAnchor, change.Justification)
                     : null))
             .ToArray());
+    }
+
+    /// <summary>Versão <c>inventory-agents-v1</c>: os agentes e os vínculos com motos e viaturas.</summary>
+    public static AgentCatalogSeed Agents(SimulatedAgentCatalog agents)
+    {
+        ArgumentNullException.ThrowIfNull(agents);
+
+        return new AgentCatalogSeed(
+            agents.Agents
+                .Select(agent => new AgentSeed(
+                    agent.FullName,
+                    agent.DisplayName,
+                    agent.RegistrationNumber,
+                    Enum.Parse<AgentRole>(agent.Role.ToString()),
+                    agent.OrganizationAcronym,
+                    agent.Rank,
+                    agent.BaseName,
+                    agent.RegisteredBeforeAnchor))
+                .ToArray(),
+            agents.Assignments
+                .Select(assignment => new AssignmentSeed(
+                    assignment.AgentOrganizationAcronym,
+                    assignment.AgentRegistrationNumber,
+                    assignment.EquipmentBrand,
+                    assignment.EquipmentSerialNumber,
+                    assignment.StartedBeforeAnchor))
+                .ToArray());
+    }
+
+    /// <summary>Versão <c>inventory-inactivations-v1</c>: as inativações de demonstração (RN-35).</summary>
+    public static InactivationSeed Inactivations(SimulatedAgentCatalog agents)
+    {
+        ArgumentNullException.ThrowIfNull(agents);
+
+        return new InactivationSeed(
+            agents.EquipmentInactivations
+                .Select(item => new EquipmentInactivationSeed(item.Brand, item.SerialNumber, item.Reason, item.BeforeAnchor))
+                .ToArray(),
+            agents.AgentInactivations
+                .Select(item => new AgentInactivationSeed(
+                    item.OrganizationAcronym,
+                    item.RegistrationNumber,
+                    item.Reason,
+                    item.OnLeaveBeforeAnchor,
+                    item.InactivatedBeforeAnchor))
+                .ToArray());
     }
 
     /// <summary>

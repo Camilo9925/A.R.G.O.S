@@ -1,5 +1,6 @@
 using Argos.Domain.Access;
 using Argos.Domain.Inventory;
+using Argos.Domain.Inventory.Agents;
 using Argos.Domain.Inventory.Equipments;
 using Argos.Domain.Inventory.Geography;
 using Argos.Domain.Inventory.Support;
@@ -40,6 +41,12 @@ internal sealed class ArgosDbContext(DbContextOptions<ArgosDbContext> options) :
     public DbSet<EquipmentStatusChange> EquipmentStatusChanges => Set<EquipmentStatusChange>();
 
     public DbSet<InventoryChange> InventoryChanges => Set<InventoryChange>();
+
+    public DbSet<Agent> Agents => Set<Agent>();
+
+    public DbSet<AgentStatusChange> AgentStatusChanges => Set<AgentStatusChange>();
+
+    public DbSet<AgentAssignment> AgentAssignments => Set<AgentAssignment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

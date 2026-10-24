@@ -189,6 +189,9 @@ internal sealed class FakeInventory :
 
     uint IAgentRepository.VersionOf(Agent agent) => AgentVersionOf(agent.Id);
 
+    Task<bool> IAgentRepository.AnyActiveInBaseAsync(Guid baseId, CancellationToken cancellationToken) =>
+        Task.FromResult(Agents.Any(agent => agent.IsActive && agent.BaseId == baseId));
+
     void IAgentRepository.Add(Agent agent) => Agents.Add(agent);
 
     public uint AgentVersionOf(Guid agentId) => AgentVersions.GetValueOrDefault(agentId, 1u);

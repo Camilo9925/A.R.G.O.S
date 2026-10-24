@@ -1,9 +1,11 @@
 using Argos.Application.Access;
 using Argos.Application.Common.Abstractions;
 using Argos.Application.Inventory;
+using Argos.Application.Inventory.Agents;
 using Argos.Application.Inventory.Equipments;
 using Argos.Application.Inventory.Geography;
 using Argos.Application.Inventory.Support;
+using Argos.Application.Inventory.Timeline;
 using Argos.Application.Inventory.Types;
 using Argos.Infrastructure.Persistence;
 using Argos.Infrastructure.Persistence.Interceptors;
@@ -53,6 +55,10 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IEquipmentRepository, EquipmentRepository>();
         services.AddScoped<IInventoryChangeLog, InventoryChangeLog>();
         services.AddScoped<IInventoryQueries, InventoryQueries>();
+        services.AddScoped<IAgentRepository, AgentRepository>();
+        services.AddScoped<IAgentAssignmentRepository, AgentAssignmentRepository>();
+        services.AddScoped<IAgentQueries, AgentQueries>();
+        services.AddScoped<ITimelineQueries, TimelineQueries>();
 
         services.AddSingleton<BusinessParameterCache>();
         services.AddScoped<IBusinessParameters, BusinessParameterStore>();

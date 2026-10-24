@@ -1,6 +1,5 @@
 using Argos.Application.Inventory;
 using Argos.Contracts.Common;
-using Argos.Domain.Common;
 using Argos.Domain.Inventory.Equipments;
 using Argos.Domain.Inventory.Geography;
 using Argos.Domain.Inventory.Support;
@@ -13,13 +12,12 @@ namespace Argos.Infrastructure.Persistence.Queries;
 
 /// <summary>
 /// Consultas de leitura do Inventário (plan 5.1, 15.8, 15.12), sem rastreamento e com projeção para os contratos. A
-/// pesquisa filtra, ordena e pagina no banco, com a necessidade de manutenção traduzida em subconsultas (D-54); o
-/// mapeamento para os contratos é feito depois da leitura, sobre poucas linhas.
+/// pesquisa filtra, ordena e pagina no banco (<see cref="EquipmentSearch"/>), com a necessidade de manutenção traduzida
+/// em subconsultas (D-54) e o filtro de ativos e inativos (US-09); o mapeamento para os contratos é feito depois da
+/// leitura, sobre poucas linhas.
 /// </summary>
 internal sealed class InventoryQueries(ArgosDbContext dbContext) : IInventoryQueries
 {
-    private const char LikeEscape = '\\';
-
     public async Task<C.MunicipalityData?> GetMunicipalityAsync(CancellationToken cancellationToken = default)
     {
         var municipality = await dbContext.Municipalities.AsNoTracking().SingleOrDefaultAsync(cancellationToken);
@@ -178,19 +176,14 @@ internal sealed class InventoryQueries(ArgosDbContext dbContext) : IInventoryQue
         return type is null ? null : ContractMapping.Type(type);
     }
 
-    public async Task<PagedResult<C.EquipmentSummary>> SearchEquipmentAsync(
+    public Task<PagedResult<C.EquipmentSummary>> SearchEquipmentAsync(
         C.EquipmentSearchQuery query, DateOnly today, int upcomingWindowDays, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var rows = EquipmentSearchRows(today, today.AddDays(upcomingWindowDays));
-
-        if (!string.IsNullOrWhiteSpace(query.Search))
-        {
-            var pattern = $"%{EscapeLike(TextNormalization.Normalize(query.Search))}%";
-            rows = rows.Where(row => EF.Functions.Like(row.SearchText, pattern, LikeEscape.ToString())
-                || EF.Functions.Like(row.NeighborhoodNameKey, pattern, LikeEscape.ToString()));
-        }
+        var rows = EquipmentSearch.WhereActivity(
+            EquipmentSearch.Rows(dbContext, today, today.AddDays(upcomingWindowDays)), query.Activity);
+        rows = EquipmentSearch.WhereTerm(rows, query.Search);
 
         if (query.TypeId.Count > 0)
         {
@@ -234,19 +227,7 @@ internal sealed class InventoryQueries(ArgosDbContext dbContext) : IInventoryQue
             rows = rows.Where(row => categories.Contains(row.Category));
         }
 
-        var totalCount = await rows.CountAsync(cancellationToken);
-        var page = await Sort(rows, query.Sort, query.Direction)
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
-            .ToListAsync(cancellationToken);
-
-        return new PagedResult<C.EquipmentSummary>
-        {
-            Items = page.Select(ToSummary).ToArray(),
-            Page = query.Page,
-            PageSize = query.PageSize,
-            TotalCount = totalCount,
-        };
+        return EquipmentSearch.PageAsync(rows, query, cancellationToken);
     }
 
     public async Task<C.EquipmentDetails?> GetEquipmentDetailsAsync(Guid id, CancellationToken cancellationToken = default)
@@ -282,6 +263,14 @@ internal sealed class InventoryQueries(ArgosDbContext dbContext) : IInventoryQue
             return null;
         }
 
+        var assignedAgents = await (
+                from assignment in dbContext.AgentAssignments.AsNoTracking()
+                join agent in dbContext.Agents on assignment.AgentId equals agent.Id
+                where assignment.EquipmentId == id && assignment.EndedAt == null
+                orderby agent.DisplayName, agent.Id
+                select new { Assignment = assignment, Agent = agent })
+            .ToListAsync(cancellationToken);
+
         var found = row.Equipment;
         return new C.EquipmentDetails
         {
@@ -306,6 +295,19 @@ internal sealed class InventoryQueries(ArgosDbContext dbContext) : IInventoryQue
             RegionName = row.Region.Name,
             Status = ContractMapping.Convert<C.EquipmentStatus>(found.Status),
             StatusChangedAt = found.StatusChangedAt,
+            AssignedAgents = assignedAgents
+                .Select(assigned => new C.AssignedAgentData
+                {
+                    AssignmentId = assigned.Assignment.Id,
+                    AgentId = assigned.Agent.Id,
+                    DisplayName = assigned.Agent.DisplayName,
+                    RegistrationNumber = assigned.Agent.RegistrationNumber,
+                    Role = ContractMapping.Convert<C.AgentRole>(assigned.Agent.Role),
+                    Status = ContractMapping.Convert<C.AgentStatus>(assigned.Agent.Status),
+                    StartedAt = assigned.Assignment.StartedAt,
+                    StartedBy = assigned.Assignment.StartedBy,
+                })
+                .ToArray(),
             IsActive = found.IsActive,
             Version = row.Version,
             CreatedAt = found.CreatedAt,
@@ -356,102 +358,6 @@ internal sealed class InventoryQueries(ArgosDbContext dbContext) : IInventoryQue
             TotalCount = totalCount,
         };
     }
-
-    /// <summary>
-    /// Base da pesquisa: só os ativos até a Fase 3. Bairro e região do fixo vêm da localização; do móvel, da base
-    /// (D-65). A necessidade de manutenção é o mesmo cálculo de <see cref="MaintenanceNeedCalculator"/>, em
-    /// subconsultas <c>EXISTS</c> sobre as manutenções abertas, da mais grave para a menos grave (D-54).
-    /// </summary>
-    private IQueryable<SearchRow> EquipmentSearchRows(DateOnly today, DateOnly upcomingLimit)
-    {
-        var maintenances = dbContext.Maintenances;
-
-        return
-            from equipment in dbContext.Equipment.AsNoTracking()
-            join type in dbContext.EquipmentTypes on equipment.TypeId equals type.Id
-            join organization in dbContext.Organizations on equipment.OrganizationId equals organization.Id
-            join operationalBase in dbContext.OperationalBases on equipment.BaseId equals (Guid?)operationalBase.Id into bases
-            from operationalBase in bases.DefaultIfEmpty()
-            join neighborhood in dbContext.Neighborhoods
-                on equipment.BaseId == null ? equipment.Location!.NeighborhoodId : operationalBase!.Location.NeighborhoodId
-                equals neighborhood.Id
-            join region in dbContext.Regions on neighborhood.RegionId equals region.Id
-            where equipment.IsActive
-            select new SearchRow
-            {
-                Id = equipment.Id,
-                TypeId = equipment.TypeId,
-                TypeName = type.Name,
-                TypeIcon = type.Icon,
-                Category = equipment.Category,
-                SerialNumber = equipment.SerialNumber,
-                Brand = equipment.Brand,
-                Model = equipment.Model,
-                Status = equipment.Status,
-                StatusOrder = equipment.Status == EquipmentStatus.NotInstalled ? 0
-                    : equipment.Status == EquipmentStatus.Operational ? 1
-                    : equipment.Status == EquipmentStatus.Malfunction ? 2
-                    : equipment.Status == EquipmentStatus.UnderMaintenance ? 3
-                    : equipment.Status == EquipmentStatus.Deactivated ? 4
-                    : 5,
-                MaintenanceNeed =
-                    maintenances.Any(maintenance => maintenance.EquipmentId == equipment.Id
-                        && maintenance.State == MaintenanceState.Open
-                        && (maintenance.Kind == MaintenanceKind.Immediate || maintenance.DueDate == null))
-                        ? MaintenanceNeed.Immediate
-                    : maintenances.Any(maintenance => maintenance.EquipmentId == equipment.Id
-                        && maintenance.State == MaintenanceState.Open
-                        && maintenance.DueDate < today)
-                        ? MaintenanceNeed.Overdue
-                    : maintenances.Any(maintenance => maintenance.EquipmentId == equipment.Id
-                        && maintenance.State == MaintenanceState.Open
-                        && maintenance.DueDate <= upcomingLimit)
-                        ? MaintenanceNeed.Upcoming
-                    : maintenances.Any(maintenance => maintenance.EquipmentId == equipment.Id
-                        && maintenance.State == MaintenanceState.Open)
-                        ? MaintenanceNeed.Scheduled
-                    : MaintenanceNeed.None,
-                OrganizationId = equipment.OrganizationId,
-                OrganizationAcronym = organization.Acronym,
-                NeighborhoodId = neighborhood.Id,
-                NeighborhoodName = neighborhood.Name,
-                NeighborhoodNameKey = neighborhood.NameKey,
-                RegionId = region.Id,
-                RegionName = region.Name,
-                SearchText = EF.Property<string>(equipment, EquipmentConfiguration.SearchTextProperty),
-                IsActive = equipment.IsActive,
-                UpdatedAt = equipment.UpdatedAt ?? equipment.CreatedAt,
-            };
-    }
-
-    /// <summary>
-    /// Ordenação da lista fechada de <see cref="C.EquipmentSortFields"/> (já conferida pela Aplicação), estável pelo id.
-    /// A situação segue a ordem do ciclo de vida (<see cref="EquipmentStatus"/>), e não a do texto gravado.
-    /// </summary>
-    private static IOrderedQueryable<SearchRow> Sort(IQueryable<SearchRow> rows, string? sort, SortDirection direction)
-    {
-        var descending = direction == SortDirection.Desc;
-
-        var ordered = sort switch
-        {
-            C.EquipmentSortFields.Type => descending ? rows.OrderByDescending(row => row.TypeName) : rows.OrderBy(row => row.TypeName),
-            C.EquipmentSortFields.Status => descending ? rows.OrderByDescending(row => row.StatusOrder) : rows.OrderBy(row => row.StatusOrder),
-            C.EquipmentSortFields.Neighborhood => descending
-                ? rows.OrderByDescending(row => row.NeighborhoodName)
-                : rows.OrderBy(row => row.NeighborhoodName),
-            C.EquipmentSortFields.UpdatedAt => descending ? rows.OrderByDescending(row => row.UpdatedAt) : rows.OrderBy(row => row.UpdatedAt),
-            _ => descending ? rows.OrderByDescending(row => row.SerialNumber) : rows.OrderBy(row => row.SerialNumber),
-        };
-
-        return ordered.ThenBy(row => row.Id);
-    }
-
-    /// <summary>Escapa os curingas do <c>LIKE</c> (<c>%</c>, <c>_</c> e a própria barra) no termo pesquisado (plan 15.8).</summary>
-    private static string EscapeLike(string term) =>
-        term
-            .Replace(LikeEscape.ToString(), $"{LikeEscape}{LikeEscape}", StringComparison.Ordinal)
-            .Replace("%", $"{LikeEscape}%", StringComparison.Ordinal)
-            .Replace("_", $"{LikeEscape}_", StringComparison.Ordinal);
 
     private IQueryable<NeighborhoodRow> Neighborhoods() =>
         from neighborhood in dbContext.Neighborhoods.AsNoTracking()
@@ -507,28 +413,6 @@ internal sealed class InventoryQueries(ArgosDbContext dbContext) : IInventoryQue
         IsActive = row.Base.IsActive,
     };
 
-    private static C.EquipmentSummary ToSummary(SearchRow row) => new()
-    {
-        Id = row.Id,
-        TypeId = row.TypeId,
-        TypeName = row.TypeName,
-        TypeIcon = row.TypeIcon,
-        Category = ContractMapping.Convert<C.EquipmentCategory>(row.Category),
-        SerialNumber = row.SerialNumber,
-        Brand = row.Brand,
-        Model = row.Model,
-        Status = ContractMapping.Convert<C.EquipmentStatus>(row.Status),
-        MaintenanceNeed = ContractMapping.Convert<C.MaintenanceNeed>(row.MaintenanceNeed),
-        OrganizationId = row.OrganizationId,
-        OrganizationAcronym = row.OrganizationAcronym,
-        NeighborhoodId = row.NeighborhoodId,
-        NeighborhoodName = row.NeighborhoodName,
-        RegionId = row.RegionId,
-        RegionName = row.RegionName,
-        IsActive = row.IsActive,
-        UpdatedAt = row.UpdatedAt,
-    };
-
     private static C.MaintenanceData ToData(Maintenance maintenance) => new()
     {
         Id = maintenance.Id,
@@ -579,51 +463,5 @@ internal sealed class InventoryQueries(ArgosDbContext dbContext) : IInventoryQue
         public Neighborhood Neighborhood { get; init; } = null!;
 
         public Region Region { get; init; } = null!;
-    }
-
-    /// <summary>Linha da pesquisa, montada no banco; os filtros e a ordenação se compõem sobre ela.</summary>
-    private sealed class SearchRow
-    {
-        public Guid Id { get; init; }
-
-        public Guid TypeId { get; init; }
-
-        public string TypeName { get; init; } = string.Empty;
-
-        public string TypeIcon { get; init; } = string.Empty;
-
-        public EquipmentCategory Category { get; init; }
-
-        public string SerialNumber { get; init; } = string.Empty;
-
-        public string Brand { get; init; } = string.Empty;
-
-        public string Model { get; init; } = string.Empty;
-
-        public EquipmentStatus Status { get; init; }
-
-        public int StatusOrder { get; init; }
-
-        public MaintenanceNeed MaintenanceNeed { get; init; }
-
-        public Guid OrganizationId { get; init; }
-
-        public string OrganizationAcronym { get; init; } = string.Empty;
-
-        public Guid NeighborhoodId { get; init; }
-
-        public string NeighborhoodName { get; init; } = string.Empty;
-
-        public string NeighborhoodNameKey { get; init; } = string.Empty;
-
-        public Guid RegionId { get; init; }
-
-        public string RegionName { get; init; } = string.Empty;
-
-        public string SearchText { get; init; } = string.Empty;
-
-        public bool IsActive { get; init; }
-
-        public DateTimeOffset UpdatedAt { get; init; }
     }
 }

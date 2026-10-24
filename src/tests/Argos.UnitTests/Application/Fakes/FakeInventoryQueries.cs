@@ -21,6 +21,8 @@ internal sealed class FakeInventoryQueries(FakeInventory inventory) : IInventory
 
     public C.AgentSearchQuery? LastAgentSearch { get; private set; }
 
+    public C.AssignableEquipmentQuery? LastAssignableSearch { get; private set; }
+
     public (DateOnly Today, int Window)? LastSearchCalendar { get; private set; }
 
     public Task<C.MunicipalityData?> GetMunicipalityAsync(CancellationToken cancellationToken = default) =>
@@ -270,6 +272,36 @@ internal sealed class FakeInventoryQueries(FakeInventory inventory) : IInventory
 
     public Task<bool> AgentExistsAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(inventory.Agents.Any(agent => agent.Id == id));
+
+    /// <summary>Aplica o critério da consulta real (D-68), com a lista de situações lida da política.</summary>
+    public Task<PagedResult<C.EquipmentSummary>> SearchAssignableEquipmentAsync(
+        C.AssignableEquipmentQuery query, DateOnly today, int upcomingWindowDays, CancellationToken cancellationToken = default)
+    {
+        LastAssignableSearch = query;
+        LastSearchCalendar = (today, upcomingWindowDays);
+
+        var items = inventory.Equipment
+            .Where(equipment => equipment.IsActive
+                && equipment.Category == EquipmentCategory.Mobile
+                && inventory.Types.Single(type => type.Id == equipment.TypeId).CrewAssignable
+                && !AssignmentPolicy.StatusesRefusingNewAssignment.Contains(equipment.Status))
+            .Select(equipment => new C.EquipmentSummary
+            {
+                Id = equipment.Id,
+                SerialNumber = equipment.SerialNumber,
+                Status = Convert<C.EquipmentStatus>(equipment.Status),
+                IsActive = equipment.IsActive,
+            })
+            .ToArray();
+
+        return Task.FromResult(new PagedResult<C.EquipmentSummary>
+        {
+            Items = items,
+            Page = query.Page,
+            PageSize = query.PageSize,
+            TotalCount = items.Length,
+        });
+    }
 
     private static bool Matches(ActivityFilter activity, bool isActive) => activity switch
     {

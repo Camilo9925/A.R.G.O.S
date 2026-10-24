@@ -24,4 +24,14 @@ public interface IAgentQueries
     Task<AgentDetails?> GetAgentDetailsAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<bool> AgentExistsAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Pesquisa paginada dos equipamentos vinculáveis (US-07; D-62, D-68; plan 15.2.10, 15.13): ativos, móveis, de tipo
+    /// com <c>CrewAssignable</c> e fora de <see cref="Argos.Domain.Inventory.Agents.AssignmentPolicy.StatusesRefusingNewAssignment"/>,
+    /// lidas do Domínio, sem lista própria. Termo, ordenação, paginação e projeção como na pesquisa de equipamentos
+    /// (<see cref="IInventoryQueries.SearchEquipmentAsync"/>), com a necessidade de manutenção calculada a partir do
+    /// <paramref name="today"/> e da janela de manutenção próxima (D-54). A ordenação já chega conferida.
+    /// </summary>
+    Task<PagedResult<EquipmentSummary>> SearchAssignableEquipmentAsync(
+        AssignableEquipmentQuery query, DateOnly today, int upcomingWindowDays, CancellationToken cancellationToken = default);
 }

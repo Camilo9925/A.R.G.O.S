@@ -23,6 +23,12 @@ public interface IAgentRepository
     /// </summary>
     uint VersionOf(Agent agent);
 
+    /// <summary>
+    /// Diz se há agente ativo com essa base de atuação (RF-019, A-19; D-57): a base com agente ativo não é inativada,
+    /// como a que tem equipamento ativo (plan 15.2.3).
+    /// </summary>
+    Task<bool> AnyActiveInBaseAsync(Guid baseId, CancellationToken cancellationToken = default);
+
     void Add(Agent agent);
 }
 

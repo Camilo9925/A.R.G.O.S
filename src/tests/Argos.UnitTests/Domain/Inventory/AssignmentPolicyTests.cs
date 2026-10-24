@@ -194,6 +194,26 @@ public sealed class AssignmentPolicyTests
         Assert.True(current.IsOpen);
     }
 
+    [Theory]
+    [InlineData(EquipmentStatus.NotInstalled)]
+    [InlineData(EquipmentStatus.Operational)]
+    [InlineData(EquipmentStatus.Malfunction)]
+    [InlineData(EquipmentStatus.UnderMaintenance)]
+    [InlineData(EquipmentStatus.Deactivated)]
+    [InlineData(EquipmentStatus.Stolen)]
+    public void StatusesRefusingNewAssignment_AreExactlyTheOnesAssignRefuses_US07_D62_D68(EquipmentStatus status)
+    {
+        var patrol = status == EquipmentStatus.NotInstalled
+            ? NewMobile(EquipmentTypeCatalog.PatrolVehicle, EquipmentStatus.NotInstalled)
+            : PatrolIn(status);
+
+        var refused = Record.Exception(() => AssignmentPolicy.Assign(
+            NewAgent(), patrol, TypeOf(EquipmentTypeCatalog.PatrolVehicle), null, Later, "admin"));
+
+        Assert.Equal(AssignmentPolicy.StatusesRefusingNewAssignment.Contains(status), refused is InventoryRuleException);
+        Assert.True(refused is null or InventoryRuleException);
+    }
+
     [Fact]
     public void Assign_WithAnotherAgentsOrClosedAssignment_IsAProgrammingError()
     {

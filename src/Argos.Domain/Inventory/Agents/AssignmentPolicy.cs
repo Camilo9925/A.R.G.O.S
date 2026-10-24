@@ -12,6 +12,14 @@ namespace Argos.Domain.Inventory.Agents;
 public static class AssignmentPolicy
 {
     /// <summary>
+    /// Situações em que o equipamento não recebe vínculo novo: Desativado e Furtado (D-62). Os vínculos existentes
+    /// continuam até serem encerrados ou até a inativação. É a mesma lista que o <see cref="Assign"/> confere e que a
+    /// consulta dos equipamentos vinculáveis exclui (D-68; plan 15.2.10, 15.13), para a regra ficar num lugar só.
+    /// </summary>
+    public static readonly IReadOnlyList<EquipmentStatus> StatusesRefusingNewAssignment =
+        [EquipmentStatus.Deactivated, EquipmentStatus.Stolen];
+
+    /// <summary>
     /// Vincula o agente ao equipamento (US-07): agente ativo; equipamento ativo, móvel e de tipo
     /// <see cref="EquipmentType.CrewAssignable"/> (viatura e moto de agente); equipamento fora de Desativado e Furtado
     /// (D-62). Um agente tem no máximo um vínculo aberto: o atual, se houver, é encerrado com
@@ -58,7 +66,7 @@ public static class AssignmentPolicy
             throw new InventoryRuleException($"Equipamentos do tipo {type.Name} não recebem vínculo de agentes.");
         }
 
-        if (equipment.Status is EquipmentStatus.Deactivated or EquipmentStatus.Stolen)
+        if (StatusesRefusingNewAssignment.Contains(equipment.Status))
         {
             throw new InventoryRuleException(
                 $"Não é possível vincular agentes a um equipamento {EquipmentStatusLabels.For(equipment.Status).ToLowerInvariant()}.");

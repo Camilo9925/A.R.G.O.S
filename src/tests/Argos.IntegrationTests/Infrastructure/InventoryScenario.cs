@@ -20,7 +20,10 @@ internal sealed record InventoryScenario(
     Guid BaseId,
     Guid CameraTypeId,
     Guid RadarTypeId,
-    Guid MotorcycleTypeId)
+    Guid MotorcycleTypeId,
+    Guid PatrolTypeId,
+    Guid ScooterTypeId,
+    Guid TaxiTypeId)
 {
     /// <summary>CEP da tabela de teste, da Rua das Flores na Vila Hespéria.</summary>
     public const string ZipCode = "16985-001";
@@ -47,7 +50,10 @@ internal sealed record InventoryScenario(
             (await queries.ListOperationalBasesAsync(organizationId: null, includeInactive: false, cancellationToken)).Single().Id,
             types.Single(type => type.Key == EquipmentTypeCatalog.SurveillanceCamera).Id,
             types.Single(type => type.Key == EquipmentTypeCatalog.TrafficRadar).Id,
-            types.Single(type => type.Key == EquipmentTypeCatalog.TrafficAgentMotorcycle).Id);
+            types.Single(type => type.Key == EquipmentTypeCatalog.TrafficAgentMotorcycle).Id,
+            types.Single(type => type.Key == EquipmentTypeCatalog.PatrolVehicle).Id,
+            types.Single(type => type.Key == EquipmentTypeCatalog.ElectricScooter).Id,
+            types.Single(type => type.Key == EquipmentTypeCatalog.PassengerTransportVehicle).Id);
     }
 
     /// <summary>Câmera fixa na Vila Hespéria ou, com <paramref name="downtown"/>, no Centro.</summary>
@@ -98,6 +104,64 @@ internal sealed record InventoryScenario(
             Attributes = new() { ["licensePlate"] = "ABC1D23", ["prefix"] = $"M-{serialNumber}" },
             Status = EquipmentStatus.Operational,
             InitialMaintenance = initialMaintenance,
+        };
+
+    /// <summary>Viatura, móvel e com tripulação (D-62), na base do Centro.</summary>
+    public CreateEquipmentRequest Patrol(string serialNumber) =>
+        new()
+        {
+            TypeId = PatrolTypeId,
+            SerialNumber = serialNumber,
+            Brand = "Rodaris",
+            Model = "Patrulha 2.0",
+            OrganizationId = OrganizationId,
+            BaseId = BaseId,
+            Attributes = new() { ["licensePlate"] = "DEF2G34", ["prefix"] = $"V-{serialNumber}", ["vehicleKind"] = "patrol-car" },
+            Status = EquipmentStatus.Operational,
+        };
+
+    /// <summary>Patinete elétrico, móvel, que não aceita vínculo de agentes (D-62).</summary>
+    public CreateEquipmentRequest Scooter(string serialNumber) =>
+        new()
+        {
+            TypeId = ScooterTypeId,
+            SerialNumber = serialNumber,
+            Brand = "Voltis",
+            Model = "V2",
+            OrganizationId = OrganizationId,
+            BaseId = BaseId,
+            Attributes = new() { ["modality"] = "public", ["operatorCompany"] = "Secretaria Municipal de Mobilidade" },
+            Status = EquipmentStatus.Operational,
+        };
+
+    /// <summary>Táxi (veículo de transporte), móvel e sem tripulação do órgão (D-62).</summary>
+    public CreateEquipmentRequest Taxi(string serialNumber) =>
+        new()
+        {
+            TypeId = TaxiTypeId,
+            SerialNumber = serialNumber,
+            Brand = "Rodaris",
+            Model = "Sedã 1.6",
+            OrganizationId = OrganizationId,
+            BaseId = BaseId,
+            Attributes = new()
+            {
+                ["modality"] = "taxi", ["licensePlate"] = "GHI3J45", ["passengerCapacity"] = "4",
+                ["permitHolder"] = "Cooperativa de Táxi de Prometeia",
+            },
+            Status = EquipmentStatus.Operational,
+        };
+
+    /// <summary>Agente de trânsito do órgão de teste, na base do Centro (RN-25: só os dados mínimos).</summary>
+    public CreateAgentRequest Agent(string registrationNumber, string displayName = "Falcão") =>
+        new()
+        {
+            FullName = "Agente Fictício de Teste",
+            DisplayName = displayName,
+            RegistrationNumber = registrationNumber,
+            Role = AgentRole.TrafficAgent,
+            OrganizationId = OrganizationId,
+            BaseId = BaseId,
         };
 
     public LocationInput HesperiaLocation() => Location(HesperiaId, "Rua das Flores", "número 181", -22.241, -49.641);

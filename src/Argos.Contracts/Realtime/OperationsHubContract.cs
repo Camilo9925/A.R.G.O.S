@@ -9,9 +9,6 @@ public static class OperationsHubContract
 
     public static class Messages
     {
-        /// <summary>Sinal de vida técnico da Fase 0; sai no T122, quando a Web passar à telemetria (D-73, D-101).</summary>
-        public const string TechnicalHeartbeatReceived = "TechnicalHeartbeatReceived";
-
         /// <summary><c>TelemetryBatchProcessed</c>, para todos (plan 16.11).</summary>
         public const string TelemetryBatchProcessed = "TelemetryBatchProcessed";
 

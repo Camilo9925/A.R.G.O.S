@@ -60,6 +60,7 @@ builder.Services.AddScoped(services => new HttpClient(new AuthorizationMessageHa
 builder.Services.AddScoped<InventoryReferenceClient>();
 builder.Services.AddScoped<EquipmentClient>();
 builder.Services.AddScoped<AgentClient>();
+builder.Services.AddScoped<OperationsClient>();
 
 // Preenchimento rápido da tela de login, só quando o nginx do ambiente Demo habilita (D-41).
 builder.Services.AddSingleton(DemoLoginOptions.From(builder.Configuration));

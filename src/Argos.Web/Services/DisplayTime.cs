@@ -14,6 +14,10 @@ public sealed class DisplayTime(TimeZoneInfo timeZone)
     public string FormatDateTime(DateTimeOffset value) =>
         TimeZoneInfo.ConvertTime(value, timeZone).ToString("dd/MM/yyyy HH:mm", CultureInfo.CurrentCulture);
 
+    /// <summary>Data e hora com segundos, como "18/10/2026 14:05:09" (última comunicação do equipamento).</summary>
+    public string FormatDateTimeWithSeconds(DateTimeOffset value) =>
+        TimeZoneInfo.ConvertTime(value, timeZone).ToString("dd/MM/yyyy HH:mm:ss", CultureInfo.CurrentCulture);
+
     /// <summary>Data do calendário (sem hora nem fuso), como a data prevista de manutenção.</summary>
     public static string FormatDate(DateOnly value) => value.ToString("dd/MM/yyyy", CultureInfo.CurrentCulture);
 

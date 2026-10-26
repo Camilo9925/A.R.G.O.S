@@ -10,7 +10,7 @@
         <MudText Typo="Typo.body2">@_view.Label</MudText>
     </MudStack>
     <MudText Typo="Typo.caption" Class="argos-connection-last">
-        Último sinal do simulador: @(Realtime.LastHeartbeat is { } heartbeat ? DisplayTime.FormatTime(heartbeat.ReceivedAt) : "aguardando")
+        Última telemetria: @(Realtime.LastTelemetryAt is { } lastTelemetry ? DisplayTime.FormatTime(lastTelemetry) : "aguardando")
     </MudText>
 </div>
 

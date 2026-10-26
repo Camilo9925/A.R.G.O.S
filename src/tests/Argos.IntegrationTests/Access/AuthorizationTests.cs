@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using System.Reflection;
 using Argos.Application.Access;
 using Argos.Contracts.Access;
-using Argos.IntegrationTests.Diagnostics;
 using Argos.IntegrationTests.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 
@@ -67,7 +66,7 @@ public sealed class AuthorizationTests(ApiFixture fixture) : IntegrationTestBase
         using var client = Fixture.Factory.CreateClient();
 
         using var response = await client.PostAsJsonAsync(
-            TechnicalHeartbeatsTests.HeartbeatsPath, TechnicalHeartbeatsTests.NewHeartbeat(), cancellationToken);
+            TelemetryHttp.BatchesPath, TelemetryHttp.EmptyBatch(), cancellationToken);
 
         await ProblemAssert.IsUnauthenticatedAsync(response, cancellationToken);
     }
@@ -79,7 +78,7 @@ public sealed class AuthorizationTests(ApiFixture fixture) : IntegrationTestBase
         using var client = Fixture.CreateSystemClient("chave-de-sistema-errada-com-32-caracteres-ou-mais");
 
         using var response = await client.PostAsJsonAsync(
-            TechnicalHeartbeatsTests.HeartbeatsPath, TechnicalHeartbeatsTests.NewHeartbeat(), cancellationToken);
+            TelemetryHttp.BatchesPath, TelemetryHttp.EmptyBatch(), cancellationToken);
 
         var problem = await ProblemAssert.IsUnauthenticatedAsync(response, cancellationToken);
         Assert.DoesNotContain("chave-de-sistema", problem.GetRawText());
@@ -128,7 +127,7 @@ public sealed class AuthorizationTests(ApiFixture fixture) : IntegrationTestBase
         using var client = Fixture.CreateUserClient(Fixture.Tokens.For(role));
 
         using var response = await client.PostAsJsonAsync(
-            TechnicalHeartbeatsTests.HeartbeatsPath, TechnicalHeartbeatsTests.NewHeartbeat(), cancellationToken);
+            TelemetryHttp.BatchesPath, TelemetryHttp.EmptyBatch(), cancellationToken);
 
         await ProblemAssert.IsForbiddenAsync(response, cancellationToken);
     }

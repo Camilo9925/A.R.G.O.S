@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using Argos.Application.Common.Abstractions;
 using Argos.Contracts.Access;
 using Argos.Contracts.Realtime;
-using Argos.IntegrationTests.Diagnostics;
+using Argos.Contracts.Telemetry;
 using Argos.IntegrationTests.Infrastructure;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
@@ -84,35 +84,43 @@ public sealed class OperationsHubTests(ApiFixture fixture) : IntegrationTestBase
         Assert.Equal([EveryoneProbe], await manager.UntilEveryoneProbeAsync(cancellationToken));
     }
 
+    /// <summary>
+    /// <c>TelemetryBatchProcessed</c> vai para todos os perfis depois de cada lote aceito, mesmo sem posições: é o que
+    /// alimenta "Última telemetria" (plan 16.11; D-73, que tirou o sinal de vida técnico).
+    /// </summary>
     [Fact]
-    public async Task TechnicalHeartbeat_ReachesEveryRole()
+    public async Task TelemetryBatchProcessed_ReachesEveryRole_D73()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var connections = new List<HubConnection>();
-        var deliveries = new List<Task<TechnicalHeartbeatNotification>>();
+        var deliveries = new List<Task<TelemetryBatchProcessed>>();
 
         try
         {
             foreach (var role in UserRoles.All)
             {
-                var received = new TaskCompletionSource<TechnicalHeartbeatNotification>(
+                var received = new TaskCompletionSource<TelemetryBatchProcessed>(
                     TaskCreationOptions.RunContinuationsAsynchronously);
                 var connection = Fixture.CreateHubConnection(Fixture.Tokens.For(role));
                 connections.Add(connection);
-                connection.On<TechnicalHeartbeatNotification>(
-                    OperationsHubContract.Messages.TechnicalHeartbeatReceived,
-                    notification => received.TrySetResult(notification));
+                connection.On<TelemetryBatchProcessed>(
+                    OperationsHubContract.Messages.TelemetryBatchProcessed,
+                    message => received.TrySetResult(message));
                 await connection.StartAndSynchronizeAsync(cancellationToken);
                 deliveries.Add(received.Task);
             }
 
-            var heartbeat = TechnicalHeartbeatsTests.NewHeartbeat();
             using var client = Fixture.CreateSystemClient();
-            using var response = await client.PostAsJsonAsync(TechnicalHeartbeatsTests.HeartbeatsPath, heartbeat, cancellationToken);
+            using var response = await client.PostAsJsonAsync(TelemetryHttp.BatchesPath, TelemetryHttp.EmptyBatch(), cancellationToken);
             Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+            var result = await response.ReadAsync<TelemetryBatchResult>(cancellationToken);
 
-            var notifications = await Task.WhenAll(deliveries).WaitAsync(DeliveryTimeout, cancellationToken);
-            Assert.All(notifications, notification => Assert.Equal(heartbeat.Sequence, notification.Sequence));
+            var messages = await Task.WhenAll(deliveries).WaitAsync(DeliveryTimeout, cancellationToken);
+            Assert.All(messages, message =>
+            {
+                Assert.Equal(result.ReceivedAt, message.ReceivedAt);
+                Assert.Empty(message.EquipmentPositions);
+            });
         }
         finally
         {

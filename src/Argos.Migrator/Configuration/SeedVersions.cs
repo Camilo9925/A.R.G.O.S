@@ -1,4 +1,5 @@
 using Argos.Application.Seeding.Inventory;
+using Argos.Application.Seeding.Operations;
 
 namespace Argos.Migrator.Configuration;
 
@@ -21,4 +22,10 @@ internal static class SeedVersions
 
     /// <summary>Fase 3: inativações de demonstração (RN-35; D-56).</summary>
     public const string InventoryInactivations = InventorySeed.InactivationsVersion;
+
+    /// <summary>Fase 4: escala de referência simulada (D-94).</summary>
+    public const string OperationsDutyRoster = OperationsSeed.DutyRosterVersion;
+
+    /// <summary>Fase 4: alertas dos equipamentos em Mau funcionamento ou Furtado (D-78).</summary>
+    public const string OperationsAlerts = OperationsSeed.AlertsVersion;
 }

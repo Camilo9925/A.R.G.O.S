@@ -185,41 +185,14 @@ internal sealed class InventoryQueries(ArgosDbContext dbContext) : IInventoryQue
             EquipmentSearch.Rows(dbContext, today, today.AddDays(upcomingWindowDays)), query.Activity);
         rows = EquipmentSearch.WhereTerm(rows, query.Search);
 
-        if (query.TypeId.Count > 0)
-        {
-            var typeIds = query.TypeId.ToArray();
-            rows = rows.Where(row => typeIds.Contains(row.TypeId));
-        }
-
-        if (query.Status.Count > 0)
-        {
-            var statuses = query.Status.Select(status => ContractMapping.Convert<EquipmentStatus>(status)).ToArray();
-            rows = rows.Where(row => statuses.Contains(row.Status));
-        }
-
-        if (query.OrganizationId.Count > 0)
-        {
-            var organizationIds = query.OrganizationId.ToArray();
-            rows = rows.Where(row => organizationIds.Contains(row.OrganizationId));
-        }
-
-        if (query.RegionId.Count > 0)
-        {
-            var regionIds = query.RegionId.ToArray();
-            rows = rows.Where(row => regionIds.Contains(row.RegionId));
-        }
-
-        if (query.NeighborhoodId.Count > 0)
-        {
-            var neighborhoodIds = query.NeighborhoodId.ToArray();
-            rows = rows.Where(row => neighborhoodIds.Contains(row.NeighborhoodId));
-        }
-
-        if (query.MaintenanceNeed.Count > 0)
-        {
-            var needs = query.MaintenanceNeed.Select(need => ContractMapping.Convert<MaintenanceNeed>(need)).ToArray();
-            rows = rows.Where(row => needs.Contains(row.MaintenanceNeed));
-        }
+        rows = EquipmentSearch.WhereFilters(
+            rows,
+            query.TypeId,
+            query.Status.Select(status => ContractMapping.Convert<EquipmentStatus>(status)).ToArray(),
+            query.MaintenanceNeed.Select(need => ContractMapping.Convert<MaintenanceNeed>(need)).ToArray(),
+            query.OrganizationId,
+            query.RegionId,
+            query.NeighborhoodId);
 
         if (query.Category.Count > 0)
         {

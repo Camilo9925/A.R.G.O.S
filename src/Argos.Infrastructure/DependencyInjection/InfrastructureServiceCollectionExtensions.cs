@@ -7,6 +7,9 @@ using Argos.Application.Inventory.Geography;
 using Argos.Application.Inventory.Support;
 using Argos.Application.Inventory.Timeline;
 using Argos.Application.Inventory.Types;
+using Argos.Application.Operations;
+using Argos.Application.Seeding.Operations;
+using Argos.Application.Telemetry;
 using Argos.Infrastructure.Persistence;
 using Argos.Infrastructure.Persistence.Interceptors;
 using Argos.Infrastructure.Persistence.Queries;
@@ -59,6 +62,13 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IAgentAssignmentRepository, AgentAssignmentRepository>();
         services.AddScoped<IAgentQueries, AgentQueries>();
         services.AddScoped<ITimelineQueries, TimelineQueries>();
+
+        // Telemetria e Central (plan 16.9).
+        services.AddScoped<ITelemetryRepository, TelemetryRepository>();
+        services.AddScoped<ITelemetryQueries, TelemetryQueries>();
+        services.AddScoped<IAlertRepository, AlertRepository>();
+        services.AddScoped<IOperationsQueries, OperationsQueries>();
+        services.AddScoped<IOperationsSeedStore, OperationsSeedStore>();
 
         services.AddSingleton<BusinessParameterCache>();
         services.AddScoped<IBusinessParameters, BusinessParameterStore>();

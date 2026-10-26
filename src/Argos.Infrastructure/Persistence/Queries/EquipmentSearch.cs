@@ -11,7 +11,8 @@ namespace Argos.Infrastructure.Persistence.Queries;
 /// <summary>
 /// Linhas da pesquisa de equipamentos (plan 15.8), montadas no banco, com o termo, a ordenação e a paginação comuns à
 /// pesquisa do inventário (US-03) e à dos equipamentos vinculáveis (D-68): a mesma consulta e a mesma projeção para
-/// <see cref="C.EquipmentSummary"/> nas duas telas (Art. V.3).
+/// <see cref="C.EquipmentSummary"/> nas duas telas (Art. V.3). Os filtros (<see cref="WhereFilters"/>) também são os
+/// da Central (RN-16, D-79).
 /// </summary>
 internal static class EquipmentSearch
 {
@@ -77,6 +78,8 @@ internal static class EquipmentSearch
                 NeighborhoodNameKey = neighborhood.NameKey,
                 RegionId = region.Id,
                 RegionName = region.Name,
+                MapLatitude = equipment.BaseId == null ? equipment.Location!.Point.Latitude : operationalBase!.Location.Point.Latitude,
+                MapLongitude = equipment.BaseId == null ? equipment.Location!.Point.Longitude : operationalBase!.Location.Point.Longitude,
                 SearchText = EF.Property<string>(equipment, EquipmentConfiguration.SearchTextProperty),
                 IsActive = equipment.IsActive,
                 UpdatedAt = equipment.UpdatedAt ?? equipment.CreatedAt,
@@ -90,6 +93,59 @@ internal static class EquipmentSearch
         ActivityFilter.All => rows,
         _ => rows.Where(row => row.IsActive),
     };
+
+    /// <summary>
+    /// Filtros da pesquisa de equipamentos (plan 15.8), os mesmos da Central (RN-16, D-79; plan 16.7): tipo, situação,
+    /// necessidade de manutenção, órgão, região e bairro (do móvel, pela base, D-65). "Ou" dentro do mesmo filtro e "e"
+    /// entre filtros (D-53); uma lista vazia não filtra. Não inclui o filtro de ativos (<see cref="WhereActivity"/>).
+    /// </summary>
+    public static IQueryable<Row> WhereFilters(
+        IQueryable<Row> rows,
+        IReadOnlyCollection<Guid> typeIds,
+        IReadOnlyCollection<EquipmentStatus> statuses,
+        IReadOnlyCollection<MaintenanceNeed> maintenanceNeeds,
+        IReadOnlyCollection<Guid> organizationIds,
+        IReadOnlyCollection<Guid> regionIds,
+        IReadOnlyCollection<Guid> neighborhoodIds)
+    {
+        if (typeIds.Count > 0)
+        {
+            var values = typeIds.ToArray();
+            rows = rows.Where(row => values.Contains(row.TypeId));
+        }
+
+        if (statuses.Count > 0)
+        {
+            var values = statuses.ToArray();
+            rows = rows.Where(row => values.Contains(row.Status));
+        }
+
+        if (organizationIds.Count > 0)
+        {
+            var values = organizationIds.ToArray();
+            rows = rows.Where(row => values.Contains(row.OrganizationId));
+        }
+
+        if (regionIds.Count > 0)
+        {
+            var values = regionIds.ToArray();
+            rows = rows.Where(row => values.Contains(row.RegionId));
+        }
+
+        if (neighborhoodIds.Count > 0)
+        {
+            var values = neighborhoodIds.ToArray();
+            rows = rows.Where(row => values.Contains(row.NeighborhoodId));
+        }
+
+        if (maintenanceNeeds.Count > 0)
+        {
+            var values = maintenanceNeeds.ToArray();
+            rows = rows.Where(row => values.Contains(row.MaintenanceNeed));
+        }
+
+        return rows;
+    }
 
     /// <summary>
     /// Termo sem acento e sem diferença de maiúsculas em <c>search_text</c> ou no nome do bairro (plan 15.8), com os
@@ -214,6 +270,11 @@ internal static class EquipmentSearch
         public Guid RegionId { get; init; }
 
         public string RegionName { get; init; } = string.Empty;
+
+        /// <summary>Posição no mapa sem telemetria: a instalação do fixo ou a base do móvel (plan 16.7).</summary>
+        public double MapLatitude { get; init; }
+
+        public double MapLongitude { get; init; }
 
         public string SearchText { get; init; } = string.Empty;
 

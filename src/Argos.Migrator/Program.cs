@@ -1,7 +1,9 @@
 using Argos.Application.Common.Abstractions;
 using Argos.Application.Common.Exceptions;
 using Argos.Application.Seeding;
+using Argos.Application.Operations;
 using Argos.Application.Seeding.Inventory;
+using Argos.Application.Seeding.Operations;
 using Argos.Infrastructure.DependencyInjection;
 using Argos.Infrastructure.Persistence;
 using Argos.Migrator.Configuration;
@@ -45,6 +47,11 @@ builder.Services.AddScoped<EquipmentCatalogSeeder>();
 builder.Services.AddScoped<AgentCatalogSeeder>();
 builder.Services.AddScoped<InactivationSeeder>();
 
+// Fase 4 (plan 16.9): escala de referência e alertas da carga, pelo mesmo passo de alertas dos casos de uso.
+builder.Services.AddScoped<EquipmentAlertRaiser>();
+builder.Services.AddScoped<DutyRosterSeeder>();
+builder.Services.AddScoped<OperationsAlertSeeder>();
+
 using var host = builder.Build();
 
 var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Argos.Migrator");
@@ -75,6 +82,10 @@ try
     {
         return 1;
     }
+
+    // Escala de referência e alertas da Central (plan 16.9), depois do Inventário.
+    await OperationsLoad.RunAsync(
+        host.Services, simulation, host.Services.GetRequiredService<TimeProvider>(), logger);
 
     // Os usuários de demonstração são reconciliados a cada execução, independentemente do seed (D-40).
     var demoUsers = builder.Configuration.GetSection(DemoUsersOptions.SectionName).Get<DemoUsersOptions>();

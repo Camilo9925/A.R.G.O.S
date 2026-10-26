@@ -5,6 +5,9 @@ using Argos.Domain.Inventory.Equipments;
 using Argos.Domain.Inventory.Geography;
 using Argos.Domain.Inventory.Support;
 using Argos.Domain.Inventory.Types;
+using Argos.Domain.Operations;
+using Argos.Domain.Operations.Alerts;
+using Argos.Domain.Telemetry;
 using Microsoft.EntityFrameworkCore;
 
 namespace Argos.Infrastructure.Persistence;
@@ -47,6 +50,14 @@ internal sealed class ArgosDbContext(DbContextOptions<ArgosDbContext> options) :
     public DbSet<AgentStatusChange> AgentStatusChanges => Set<AgentStatusChange>();
 
     public DbSet<AgentAssignment> AgentAssignments => Set<AgentAssignment>();
+
+    public DbSet<ResourceLiveState> ResourceLiveStates => Set<ResourceLiveState>();
+
+    public DbSet<TelemetryReading> TelemetryReadings => Set<TelemetryReading>();
+
+    public DbSet<Alert> Alerts => Set<Alert>();
+
+    public DbSet<AgentDutyShift> AgentDutyShifts => Set<AgentDutyShift>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

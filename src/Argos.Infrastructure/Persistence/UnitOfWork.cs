@@ -2,8 +2,10 @@ using Argos.Application.Common.Abstractions;
 using Argos.Application.Common.Exceptions;
 using Argos.Application.Inventory.Agents;
 using Argos.Application.Inventory.Equipments;
+using Argos.Application.Operations;
 using Argos.Domain.Inventory.Equipments;
 using Argos.Infrastructure.Persistence.Configurations.Inventory;
+using Argos.Infrastructure.Persistence.Configurations.Operations;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -14,7 +16,7 @@ namespace Argos.Infrastructure.Persistence;
 /// <see cref="ConflictException"/> (409), e não erro 500: a concorrência otimista do <c>xmin</c> (D-60) e a violação de
 /// um índice único por duas gravações simultâneas, que passaram juntas pela verificação da Aplicação. Na RN-01 o
 /// conflito aponta o equipamento existente (US-01), e na matrícula do agente traz a mesma mensagem (US-06), como a
-/// verificação da Aplicação (plan 15.13).
+/// verificação da Aplicação (plan 15.13); no alerta aberto da mesma causa (RN-19), a mensagem de plan 16.9.
 /// </summary>
 internal sealed class UnitOfWork(ArgosDbContext dbContext) : IUnitOfWork
 {
@@ -42,6 +44,7 @@ internal sealed class UnitOfWork(ArgosDbContext dbContext) : IUnitOfWork
             {
                 EquipmentConfiguration.BrandAndSerialIndex => await DuplicateBrandAndSerialAsync(exception, cancellationToken),
                 AgentConfiguration.RegistrationIndex => new ConflictException(AgentService.DuplicateRegistrationMessage, exception),
+                AlertConfiguration.OpenAlertIndex => new ConflictException(EquipmentAlertRaiser.DuplicateOpenAlertMessage, exception),
                 _ => new ConflictException(DuplicateMessage, exception),
             };
         }

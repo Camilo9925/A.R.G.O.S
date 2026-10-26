@@ -99,7 +99,7 @@ internal static class InventoryLoad
         }
     }
 
-    private static void Log(ILogger logger, SeedResult result, int seed)
+    internal static void Log(ILogger logger, SeedResult result, int seed)
     {
         if (result.AlreadyApplied)
         {

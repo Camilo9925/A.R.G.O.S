@@ -21,6 +21,14 @@ builder.Services.AddOptions<SimulatorOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services.AddOptions<TelemetryOptions>()
+    .Bind(builder.Configuration.GetSection(TelemetryOptions.SectionName))
+    .ValidateDataAnnotations()
+    .Validate(
+        options => options.SpeedsKmh is { Vehicle: > 0, Motorcycle: > 0, Scooter: > 0, OnFoot: > 0 },
+        "As velocidades de Simulator:Telemetry:SpeedsKmh devem ser maiores que zero.")
+    .ValidateOnStart();
+
 builder.Services.AddOptions<SimulationOptions>()
     .Bind(builder.Configuration.GetSection(SimulationOptions.SectionName))
     .ValidateOnStart();
@@ -35,7 +43,7 @@ builder.Services.AddHttpClient<ArgosApiClient>((serviceProvider, client) =>
     client.DefaultRequestHeaders.Add(SystemKeyContract.HeaderName, options.SystemKey);
 });
 
-builder.Services.AddHostedService<TechnicalHeartbeatWorker>();
+builder.Services.AddHostedService<TelemetryWorker>();
 
 builder.Services.AddHealthChecks();
 

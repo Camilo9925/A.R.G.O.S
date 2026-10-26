@@ -72,7 +72,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Demo
       Simulation__Seed: ${SIMULATION_SEED:-42}
-      Simulator__HeartbeatIntervalSeconds: ${HEARTBEAT_INTERVAL_SECONDS:-5}
+      Simulator__Telemetry__PositionIntervalSeconds: ${TELEMETRY_POSITION_INTERVAL_SECONDS:-5}
+      Simulator__Telemetry__FixedHeartbeatIntervalSeconds: ${TELEMETRY_HEARTBEAT_INTERVAL_SECONDS:-60}
       Simulator__SystemKey: ${ARGOS_SYSTEM_KEY:?Defina ARGOS_SYSTEM_KEY no .env}
     ports:
       - "8082:8080"

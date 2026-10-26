@@ -136,7 +136,8 @@ O `migrator` só cria os parâmetros que ainda não existem no banco e **nunca s
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Banco PostgreSQL | texto livre |
 | `POSTGRES_HOST_PORT` | Porta do banco no host (só `127.0.0.1`) | número; padrão `5432` |
 | `SIMULATION_SEED` | Semente da simulação: a mesma semente gera os mesmos dados | número |
-| `HEARTBEAT_INTERVAL_SECONDS` | Intervalo do sinal de vida do simulador | segundos |
+| `TELEMETRY_POSITION_INTERVAL_SECONDS` | Intervalo entre os lotes de telemetria do simulador (posições e trocas de turno) | segundos; padrão `5` |
+| `TELEMETRY_HEARTBEAT_INTERVAL_SECONDS` | Intervalo do sinal de vida dos equipamentos fixos simulados | segundos; padrão `60` |
 | `ARGOS_JWT_SIGNING_KEY` | Chave que assina o token de acesso dos usuários | **segredo**, no mínimo 32 caracteres |
 | `ARGOS_SYSTEM_KEY` | Chave com que o simulador (PROMETHEUS) se autentica na API | **segredo**, no mínimo 32 caracteres |
 | `DEMO_ADMIN_LOGIN`, `DEMO_OPERATOR_LOGIN`, `DEMO_MANAGER_LOGIN` | Login de cada usuário de demonstração | 3 a 50 caracteres entre `a-z`, `0-9`, `.`, `-` e `_` |

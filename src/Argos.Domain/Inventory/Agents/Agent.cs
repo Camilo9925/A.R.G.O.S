@@ -160,14 +160,25 @@ public sealed partial class Agent : IAuditable, IDeactivatable
     }
 
     /// <summary>
-    /// Muda a situação (RN-12): qualquer situação diferente da atual, sem justificativa, registrada com instante e
-    /// autor. Recusa cadastro inativo (RN-35) e a mesma situação, nessa ordem.
+    /// Muda a situação (RN-12): qualquer situação diferente da atual, sem justificativa, registrada com instante, autor e
+    /// origem. Recusa cadastro inativo (RN-35) e a mesma situação, nessa ordem. A situação reportada pelo PROMETHEUS usa
+    /// a mesma regra, com a origem <see cref="AgentStatusChangeOrigin.Telemetry"/> (plan 16.3).
     /// </summary>
+    /// <param name="origin">
+    /// <see cref="AgentStatusChangeOrigin.Manual"/> (padrão) ou <see cref="AgentStatusChangeOrigin.Telemetry"/>; o
+    /// registro inicial só vem do cadastro.
+    /// </param>
     /// <exception cref="InventoryRuleException">Cadastro inativo (RN-35) ou mesma situação.</exception>
     /// <exception cref="DomainValidationException">Situação desconhecida, no campo <c>status</c>.</exception>
-    public void ChangeStatus(AgentStatus target, DateTimeOffset at, string by)
+    public void ChangeStatus(
+        AgentStatus target, DateTimeOffset at, string by, AgentStatusChangeOrigin origin = AgentStatusChangeOrigin.Manual)
     {
         var author = InventoryAuthor.Valid(by);
+        if (origin is not (AgentStatusChangeOrigin.Manual or AgentStatusChangeOrigin.Telemetry))
+        {
+            throw new ArgumentOutOfRangeException(nameof(origin), origin, "A mudança de situação é manual ou da telemetria.");
+        }
+
         EnsureActive("Agente inativo não pode mudar de situação.");
 
         if (!Enum.IsDefined(target))
@@ -180,7 +191,7 @@ public sealed partial class Agent : IAuditable, IDeactivatable
             throw new InventoryRuleException("O agente já está nessa situação.");
         }
 
-        _statusChanges.Add(AgentStatusChange.Record(Id, Status, target, AgentStatusChangeOrigin.Manual, at, author));
+        _statusChanges.Add(AgentStatusChange.Record(Id, Status, target, origin, at, author));
         Status = target;
     }
 

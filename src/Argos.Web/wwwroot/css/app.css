@@ -457,3 +457,175 @@ h1:focus {
 .argos-map-legend {
   margin-bottom: 0.75rem;
 }
+
+/* Cidade Preditiva (US-20, US-25; plan 17.12): legenda, mapa de regiões, grade 7 × 6 e painel de explicação. */
+.argos-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.argos-predictive {
+  padding: 0 1rem 1.5rem;
+}
+
+.argos-risk-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.argos-predictive-body {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .argos-predictive-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.argos-predictive-map .argos-map {
+  height: clamp(22rem, 55vh, 34rem);
+  border: 1px solid var(--mud-palette-lines-default);
+  border-radius: 4px;
+}
+
+.argos-risk-table-wrap {
+  overflow-x: auto;
+}
+
+.argos-risk-table {
+  width: 100%;
+  min-width: 34rem;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 3px;
+  font-size: 0.8125rem;
+}
+
+.argos-risk-table th {
+  padding: 0.25rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--mud-palette-text-primary);
+}
+
+.argos-risk-table tbody th {
+  width: 7.5rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.argos-risk-caption {
+  caption-side: top;
+  padding-bottom: 0.25rem;
+  text-align: left;
+  font-size: 0.8125rem;
+  color: var(--mud-palette-text-secondary);
+}
+
+.argos-risk-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: 0.25rem;
+  width: 100%;
+  min-height: 3.1rem;
+  padding: 0.2rem;
+  border: 1px solid var(--argos-risk-color);
+  border-left-width: 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--argos-risk-color) 22%, transparent);
+  color: var(--mud-palette-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.argos-risk-cell:hover {
+  background: color-mix(in srgb, var(--argos-risk-color) 38%, transparent);
+}
+
+.argos-risk-cell:focus-visible {
+  outline: 2px solid var(--mud-palette-primary);
+  outline-offset: 1px;
+}
+
+.argos-risk-cell--selected {
+  box-shadow: 0 0 0 2px var(--mud-palette-primary);
+}
+
+.argos-risk-cell .argos-risk-icon {
+  width: 1rem;
+  height: 1rem;
+  color: var(--argos-risk-color);
+}
+
+.argos-risk-number {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.argos-risk-level {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 0.7rem;
+  line-height: 1.1;
+}
+
+/* Rótulo fixo da região no mapa: "Zona Leste · Alto (68)". */
+.leaflet-tooltip.argos-region-label {
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--mud-palette-lines-default);
+  background: var(--mud-palette-surface);
+  color: var(--mud-palette-text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.leaflet-tooltip.argos-region-label::before {
+  display: none;
+}
+
+.argos-explanation-list {
+  display: grid;
+  grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr);
+  gap: 0.5rem 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.argos-explanation-list dt {
+  font-weight: 600;
+}
+
+.argos-explanation-list dd {
+  margin: 0;
+}
+
+.argos-explanation-factors {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+@media (max-width: 640px) {
+  .argos-explanation-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+  }
+
+  .argos-explanation-list dd {
+    margin-bottom: 0.5rem;
+  }
+}

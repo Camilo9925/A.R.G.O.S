@@ -1,0 +1,17 @@
+@* Legenda do risco (RF-043; Art. X.2): as faixas dos quatro níveis recebidas da API, cada uma com cor, ícone e texto, e "Dados insuficientes". Sempre visível. *@
+<div class="argos-risk-legend" role="group" aria-label="Legenda do índice de risco">
+    <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mr-2">Índice de risco</MudText>
+    <div class="argos-legend">
+        @foreach (var range in Levels)
+        {
+            var token = RiskLevelTokens.For(range.Level);
+            <TokenBadge Token="@(new StatusToken($"{token.Label} · {range.From}–{range.To}", token.Color, token.Icon))" />
+        }
+        <TokenBadge Token="RiskLevelTokens.InsufficientData" />
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<RiskLevelRange> Levels { get; set; } = [];
+}

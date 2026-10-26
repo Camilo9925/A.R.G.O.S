@@ -1,8 +1,284 @@
 @page "/predictive"
 
 @attribute [Authorize(Policy = Permissions.PredictiveView)]
+@inject PredictiveClient Risk
+@inject InventoryReferenceClient Reference
+@inject DisplayTime Time
 
+@*
+    Cidade Preditiva (US-20, US-25; plan 17.12). A grade, o mapa e a explicação vêm prontos da API (D-59): índice, nível,
+    faixas da legenda, confiança, fatores e textos. A página só escolhe a região e o horizonte e mostra o que recebe.
+    A aba "Reforço de equipes" (US-21) não foi entregue (D-100).
+*@
 <PageTitle>Preditiva · ARGOS</PageTitle>
 
-<UnderConstruction Title="Cidade Preditiva"
-                   Description="Aqui você vai ver índices de risco, recomendações de reforço e previsões explicadas a partir do histórico da operação." />
+<div class="argos-predictive">
+    <MudText Typo="Typo.h5" HtmlTag="h1">Cidade Preditiva</MudText>
+    <MudText Typo="Typo.body2" Class="mb-2">
+        Índice de risco de 0 a 100 por região, calculado sobre ocorrências simuladas (100 = a célula mais intensa da cidade).
+        A previsão é uma sugestão para apoiar a decisão, nunca uma ordem.
+    </MudText>
+
+    <MudTabs Elevation="0" ApplyEffectsToContainer="true" TabPanelsClass="pt-3">
+        <MudTabPanel Text="Risco por região">
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" role="alert" Class="mb-3">
+                    @_error
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="LoadAsync" Class="ml-2">
+                        Tentar novamente
+                    </MudButton>
+                </MudAlert>
+            }
+
+            @if (_forecast is null)
+            {
+                @if (_error is null)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-hidden="true" />
+                    <MudText Typo="Typo.body2" Class="mt-2" role="status">Carregando a Cidade Preditiva…</MudText>
+                }
+            }
+            else if (_forecast.Regions.Count == 0)
+            {
+                <EmptyState Title="Nenhuma região cadastrada."
+                            Description="Sem regiões não há o que calcular. Cadastre as regiões no Inventário." />
+            }
+            else
+            {
+                @if (_loading)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-hidden="true" Class="mb-2" />
+                }
+
+                <MudPaper Outlined="true" Class="pa-2 mb-3">
+                    <div class="argos-filters argos-filters--compact">
+                        <MudSelect T="Guid" Label="Região" Variant="Variant.Outlined" Dense="true"
+                                   Value="_regionId" ValueChanged="SelectRegionAsync"
+                                   ToStringFunc="@(id => _forecast.Regions.FirstOrDefault(region => region.RegionId == id)?.RegionName ?? string.Empty)">
+                            @foreach (var region in _forecast.Regions)
+                            {
+                                <MudSelectItem T="Guid" Value="@region.RegionId">@region.RegionName</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect T="ForecastHorizon" Label="Horizonte do mapa" Variant="Variant.Outlined" Dense="true"
+                                   Value="_horizon" ValueChanged="SelectHorizonAsync"
+                                   ToStringFunc="@(horizon => HorizonText(horizon))">
+                            <MudSelectItem T="ForecastHorizon" Value="ForecastHorizon.Next24Hours">@HorizonText(ForecastHorizon.Next24Hours)</MudSelectItem>
+                            <MudSelectItem T="ForecastHorizon" Value="ForecastHorizon.Next7Days">@HorizonText(ForecastHorizon.Next7Days)</MudSelectItem>
+                        </MudSelect>
+                    </div>
+                </MudPaper>
+
+                <RiskLegend Levels="_forecast.Levels" />
+
+                <div class="argos-predictive-body">
+                    <section class="argos-predictive-map" aria-label="Mapa das regiões">
+                        <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-1">Mapa das regiões · @HorizonText(_horizon)</MudText>
+                        <MudText Typo="Typo.caption" Class="mb-2 d-block">
+                            Pico de cada região entre @Time.FormatDateTime(_forecast.Start) e @Time.FormatDateTime(_forecast.End). Clique numa região para ver a grade dela.
+                        </MudText>
+                        <ArgosMap Regions="_mapRegions" OnRegionClick="OnRegionClickedAsync" />
+                    </section>
+
+                    <section class="argos-predictive-grid" aria-label="Grade de risco da região">
+                        <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-1">Grade de risco · @(SelectedRegion?.RegionName)</MudText>
+                        @if (_grid is null)
+                        {
+                            <MudText Typo="Typo.body2" role="status">Carregando a grade…</MudText>
+                        }
+                        else if (_grid.InsufficientData)
+                        {
+                            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Icon="@RiskLevelTokens.InsufficientData.Icon">
+                                @_grid.Explanation.InsufficientDataMessage
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <RiskGridTable Grid="_grid" Selected="_cell" OnSelect="SelectCell" />
+                        }
+                    </section>
+                </div>
+
+                @if (ActiveExplanation is { } explanation)
+                {
+                    <div class="mt-3">
+                        <ExplanationPanel Explanation="explanation"
+                                          Title="@ExplanationTitle"
+                                          OnReset="@(_cell is null ? default : EventCallback.Factory.Create(this, ResetCell))" />
+                    </div>
+                }
+            }
+        </MudTabPanel>
+    </MudTabs>
+</div>
+
+@code {
+    private IReadOnlyList<RegionData> _regionData = [];
+    private RiskForecast? _forecast;
+    private RiskGrid? _grid;
+    private RiskGridCell? _cell;
+    private IReadOnlyList<MapRegion>? _mapRegions;
+    private ForecastHorizon _horizon = ForecastHorizon.Next24Hours;
+    private Guid _regionId;
+    private string? _error;
+    private bool _loading;
+    private int _gridSequence;
+
+    private RiskForecastRegion? SelectedRegion =>
+        _forecast?.Regions.FirstOrDefault(region => region.RegionId == _regionId);
+
+    /// <summary>A da célula escolhida na grade ou, sem ela, a da região no horizonte do mapa (CS-06).</summary>
+    private PredictionExplanation? ActiveExplanation => _cell?.Explanation ?? SelectedRegion?.Explanation;
+
+    private string ExplanationTitle => _cell is { } cell && _grid is not null
+        ? $"Explicação da célula · {PredictiveLabels.DayName(cell.DayOfWeek)}, {_grid.Bands.First(band => band.Band == cell.Band).Label}"
+        : $"Explicação da região · {SelectedRegion?.RegionName} · {HorizonText(_horizon)}";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private static string HorizonText(ForecastHorizon horizon) => horizon switch
+    {
+        ForecastHorizon.Next24Hours => "Próximas 24 horas",
+        ForecastHorizon.Next7Days => "Próximos 7 dias",
+        _ => horizon.ToString(),
+    };
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var regions = Reference.ListRegionsAsync();
+            var forecast = Risk.GetForecastAsync(_horizon);
+            (_regionData, _forecast) = (await regions, await forecast);
+
+            if (_forecast.Regions.All(region => region.RegionId != _regionId))
+            {
+                _regionId = (_forecast.Regions.FirstOrDefault(region => !region.InsufficientData) ?? _forecast.Regions.FirstOrDefault())
+                    ?.RegionId ?? Guid.Empty;
+            }
+
+            await LoadGridAsync();
+            RebuildMap();
+        }
+        catch (Exception exception) when (exception is ApiProblemException or HttpRequestException)
+        {
+            _error = "Não foi possível carregar a Cidade Preditiva. Tente novamente.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadGridAsync()
+    {
+        var sequence = ++_gridSequence;
+        _grid = null;
+        _cell = null;
+
+        if (_regionId == Guid.Empty)
+        {
+            return;
+        }
+
+        var grid = await Risk.GetGridAsync(_regionId);
+
+        // Uma escolha mais nova da região vale mais que esta resposta.
+        if (sequence == _gridSequence)
+        {
+            _grid = grid;
+        }
+    }
+
+    private async Task SelectRegionAsync(Guid regionId)
+    {
+        if (regionId == _regionId)
+        {
+            return;
+        }
+
+        _regionId = regionId;
+        _error = null;
+
+        try
+        {
+            await LoadGridAsync();
+        }
+        catch (Exception exception) when (exception is ApiProblemException or HttpRequestException)
+        {
+            _error = "Não foi possível carregar a grade da região. Tente novamente.";
+        }
+
+        RebuildMap();
+    }
+
+    private async Task SelectHorizonAsync(ForecastHorizon horizon)
+    {
+        if (horizon == _horizon)
+        {
+            return;
+        }
+
+        _horizon = horizon;
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            _forecast = await Risk.GetForecastAsync(horizon);
+            RebuildMap();
+        }
+        catch (Exception exception) when (exception is ApiProblemException or HttpRequestException)
+        {
+            _error = "Não foi possível carregar o mapa do horizonte. Tente novamente.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task OnRegionClickedAsync(string key) =>
+        Guid.TryParse(key, out var regionId) ? SelectRegionAsync(regionId) : Task.CompletedTask;
+
+    private void SelectCell(RiskGridCell cell) => _cell = cell;
+
+    private void ResetCell() => _cell = null;
+
+    /// <summary>Uma lista nova a cada mudança, para o mapa repintar (cor pelo nível do horizonte, contorno da região escolhida).</summary>
+    private void RebuildMap()
+    {
+        if (_forecast is null)
+        {
+            return;
+        }
+
+        var boundaries = _regionData.Where(region => region.Boundary is { Count: > 0 }).ToDictionary(region => region.Id);
+        _mapRegions = _forecast.Regions
+            .Where(region => boundaries.ContainsKey(region.RegionId))
+            .Select(region =>
+            {
+                var token = region is { InsufficientData: false, Level: { } level }
+                    ? RiskLevelTokens.For(level)
+                    : RiskLevelTokens.InsufficientData;
+                var label = region.InsufficientData || region.Index is null
+                    ? $"{region.RegionName} · {RiskLevelTokens.InsufficientData.Label}"
+                    : $"{region.RegionName} · {token.Label} ({region.Index})";
+
+                return new MapRegion(
+                    region.RegionId.ToString(),
+                    boundaries[region.RegionId].Boundary!
+                        .Select(ring => ring.Select(point => new[] { point.Latitude, point.Longitude }).ToArray())
+                        .ToArray(),
+                    token.Color,
+                    label,
+                    region.InsufficientData,
+                    region.RegionId == _regionId);
+            })
+            .ToArray();
+    }
+}

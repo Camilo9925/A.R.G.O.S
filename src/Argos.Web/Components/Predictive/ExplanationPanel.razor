@@ -1,0 +1,88 @@
+@inject DisplayTime Time
+
+@* Explicação da previsão (US-25; RF-049; RN-28, RN-29; CS-06): o que é, o horizonte, os dados considerados (sempre
+   simulados), os fatores, a confiança e a recomendação, ou "Dados insuficientes". Os textos vêm prontos (D-59). *@
+<MudPaper Outlined="true" Class="pa-3 argos-explanation" role="region" aria-labelledby="@_titleId">
+    <div class="d-flex flex-wrap align-center justify-space-between mb-2">
+        <MudText Typo="Typo.h6" HtmlTag="h2" id="@_titleId">@Title</MudText>
+        @if (OnReset.HasDelegate)
+        {
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="() => OnReset.InvokeAsync()">
+                @ResetText
+            </MudButton>
+        }
+    </div>
+
+    @if (Explanation.InsufficientData)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Icon="@RiskLevelTokens.InsufficientData.Icon" Class="mb-3">
+            @Explanation.InsufficientDataMessage
+        </MudAlert>
+    }
+
+    <dl class="argos-explanation-list">
+        <dt>O que é</dt>
+        <dd>@Explanation.Subject</dd>
+
+        <dt>Horizonte</dt>
+        <dd>
+            @Explanation.HorizonLabel
+            @if (Explanation.HorizonStart is { } start && Explanation.HorizonEnd is { } end)
+            {
+                <span> (de @Time.FormatDateTime(start) a @Time.FormatDateTime(end))</span>
+            }
+        </dd>
+
+        <dt>Dados considerados</dt>
+        <dd>
+            @Explanation.DataConsidered.Description
+            @if (Explanation.DataConsidered.IsSimulated)
+            {
+                <span class="ml-1"><TokenBadge Token="PredictiveLabels.Simulated" /></span>
+            }
+        </dd>
+
+        @if (!Explanation.InsufficientData)
+        {
+            <dt>Fatores</dt>
+            <dd>
+                <ul class="argos-explanation-factors">
+                    @foreach (var factor in Explanation.Factors)
+                    {
+                        <li><strong>@factor.Label:</strong> @factor.Description</li>
+                    }
+                </ul>
+            </dd>
+
+            @if (Explanation.Confidence is { } confidence)
+            {
+                <dt>Confiança</dt>
+                <dd><TokenBadge Token="ConfidenceTokens.For(confidence)" /></dd>
+            }
+        }
+
+        <dt>Recomendação</dt>
+        <dd>@Explanation.Recommendation</dd>
+    </dl>
+
+    <MudText Typo="Typo.caption">
+        A previsão é uma sugestão para apoiar a decisão da equipe, calculada sobre ocorrências simuladas; não é uma ordem.
+    </MudText>
+</MudPaper>
+
+@code {
+    private readonly string _titleId = $"argos-explanation-{Guid.NewGuid():N}";
+
+    [Parameter, EditorRequired]
+    public PredictionExplanation Explanation { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Quando há uma explicação mais específica aberta (a de uma célula), o botão volta à da região.</summary>
+    [Parameter]
+    public EventCallback OnReset { get; set; }
+
+    [Parameter]
+    public string ResetText { get; set; } = "Voltar à região";
+}

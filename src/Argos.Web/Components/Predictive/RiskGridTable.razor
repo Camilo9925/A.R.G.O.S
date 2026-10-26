@@ -1,0 +1,56 @@
+@* Grade de risco da região (US-20; RF-043; Art. X.2): 7 dias × 6 faixas, cada célula com o número, o nome do nível, o ícone e a cor. Vem tudo pronto da API (D-59). *@
+<div class="argos-risk-table-wrap">
+    <table class="argos-risk-table">
+        <caption class="argos-risk-caption">Índice de risco da @Grid.RegionName por dia da semana e faixa horária</caption>
+        <thead>
+            <tr>
+                <th scope="col"><span class="argos-visually-hidden">Dia da semana</span></th>
+                @foreach (var band in Grid.Bands)
+                {
+                    <th scope="col">@band.Label</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var day in PredictiveLabels.WeekDays)
+            {
+                <tr>
+                    <th scope="row">@PredictiveLabels.DayName(day)</th>
+                    @foreach (var band in Grid.Bands)
+                    {
+                        var cell = Grid.Cells.FirstOrDefault(item => item.DayOfWeek == day && item.Band == band.Band);
+                        <td>
+                            @if (cell is not null)
+                            {
+                                var token = RiskLevelTokens.For(cell.Level);
+                                var confidence = ConfidenceTokens.For(cell.Confidence);
+                                var selected = Selected is { } current && current.DayOfWeek == day && current.Band == band.Band;
+                                <button type="button"
+                                        class="@($"argos-risk-cell{(selected ? " argos-risk-cell--selected" : string.Empty)}")"
+                                        style="@($"--argos-risk-color: {token.Color}")"
+                                        aria-pressed="@(selected ? "true" : "false")"
+                                        aria-label="@($"{PredictiveLabels.DayName(day)}, {band.Label}: índice {cell.Index}, risco {token.Label}, confiança {confidence.Label}")"
+                                        @onclick="() => OnSelect.InvokeAsync(cell)">
+                                    <MudIcon Icon="@token.Icon" Size="Size.Small" aria-hidden="true" Class="argos-risk-icon" />
+                                    <span class="argos-risk-number">@cell.Index</span>
+                                    <span class="argos-risk-level">@token.Label</span>
+                                </button>
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public RiskGrid Grid { get; set; } = null!;
+
+    [Parameter]
+    public RiskGridCell? Selected { get; set; }
+
+    [Parameter]
+    public EventCallback<RiskGridCell> OnSelect { get; set; }
+}

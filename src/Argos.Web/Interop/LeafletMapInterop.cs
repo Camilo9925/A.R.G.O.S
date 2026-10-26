@@ -49,6 +49,19 @@ public sealed class LeafletMapInterop(IJSRuntime jsRuntime) : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Desenha a lista completa de regiões da Preditiva (polígono colorido, contorno tracejado para dados insuficientes,
+    /// rótulo fixo); o clique volta em <c>OnRegionClicked(key)</c> (plan 17.12).
+    /// </summary>
+    public async Task SetRegionsAsync<TReceiver>(IReadOnlyList<MapRegion> regions, DotNetObjectReference<TReceiver> receiver)
+        where TReceiver : class
+    {
+        if (_module is not null && _mapId is { } id)
+        {
+            await _module.InvokeVoidAsync("setRegions", id, regions, receiver);
+        }
+    }
+
     public async Task UpdatePositionsAsync(IReadOnlyList<MapPositionUpdate> updates)
     {
         if (_module is not null && _mapId is { } id && updates.Count > 0)

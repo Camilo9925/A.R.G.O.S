@@ -251,6 +251,57 @@ export function setMarkers(id, markers, dotNetRef) {
   entry.cluster.addLayers(layers);
 }
 
+// Regiões da Preditiva (plan 17.12): polígonos coloridos pelo nível, com rótulo fixo no centro e o clique devolvido ao
+// .NET. O JS só desenha o que recebe; a cor, o nível e o texto vêm prontos da API (D-59). Região sem dados suficientes
+// vem em cinza com contorno tracejado (RN-29). Cada região é focável pelo teclado e responde a Enter e Espaço.
+export function setRegions(id, regions, dotNetRef) {
+  const entry = maps.get(id);
+  if (!entry) {
+    return;
+  }
+
+  entry.dotNetRef = dotNetRef;
+  entry.regionLayer?.remove();
+  entry.regionLayer = L.featureGroup().addTo(entry.map);
+
+  for (const region of regions) {
+    const polygon = L.polygon(region.rings, {
+      color: region.color,
+      weight: region.isSelected ? 5 : 2,
+      dashArray: region.isDashed ? "8 6" : null,
+      fillColor: region.color,
+      fillOpacity: region.isDashed ? 0.12 : 0.38,
+      bubblingMouseEvents: false,
+    }).addTo(entry.regionLayer);
+
+    polygon.bindTooltip(region.label, {
+      permanent: true,
+      direction: "center",
+      className: "argos-region-label",
+    });
+    polygon.on("click", () => entry.dotNetRef?.invokeMethodAsync("OnRegionClicked", region.key));
+
+    const element = polygon.getElement();
+    if (element) {
+      element.setAttribute("tabindex", "0");
+      element.setAttribute("role", "button");
+      element.setAttribute("aria-label", region.label);
+      element.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          entry.dotNetRef?.invokeMethodAsync("OnRegionClicked", region.key);
+        }
+      });
+    }
+  }
+
+  // Enquadra as regiões na primeira vez; depois o mapa fica onde o usuário o deixou.
+  if (!entry.regionsFitted && entry.regionLayer.getLayers().length > 0) {
+    entry.regionsFitted = true;
+    entry.map.fitBounds(entry.regionLayer.getBounds(), { padding: [12, 12] });
+  }
+}
+
 // Move os marcadores conhecidos; ids ausentes (fora do filtro, por exemplo) são ignorados.
 export function updatePositions(id, updates) {
   const entry = maps.get(id);

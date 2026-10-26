@@ -12,6 +12,7 @@
     private DotNetObjectReference<ArgosMap>? _self;
     private bool _renderedDarkMode;
     private IReadOnlyList<MapMarker>? _drawnMarkers;
+    private IReadOnlyList<MapRegion>? _drawnRegions;
 
     [CascadingParameter(Name = "IsDarkMode")]
     public bool IsDarkMode { get; set; } = true;
@@ -23,6 +24,14 @@
     /// <summary>Chave do marcador clicado.</summary>
     [Parameter]
     public EventCallback<string> OnMarkerClick { get; set; }
+
+    /// <summary>Regiões a pintar (Preditiva). Uma lista nova substitui a anterior.</summary>
+    [Parameter]
+    public IReadOnlyList<MapRegion>? Regions { get; set; }
+
+    /// <summary>Chave da região clicada.</summary>
+    [Parameter]
+    public EventCallback<string> OnRegionClick { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -43,6 +52,12 @@
         {
             _drawnMarkers = Markers;
             await _interop.SetMarkersAsync(Markers, _self);
+        }
+
+        if (_interop is not null && _self is not null && Regions is not null && !ReferenceEquals(Regions, _drawnRegions))
+        {
+            _drawnRegions = Regions;
+            await _interop.SetRegionsAsync(Regions, _self);
         }
     }
 
@@ -66,6 +81,9 @@
 
     [JSInvokable]
     public Task OnMarkerClicked(string key) => OnMarkerClick.InvokeAsync(key);
+
+    [JSInvokable]
+    public Task OnRegionClicked(string key) => OnRegionClick.InvokeAsync(key);
 
     public async ValueTask DisposeAsync()
     {

@@ -1,0 +1,298 @@
+@inject OperationsClient Operations
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject DisplayTime DisplayTime
+
+@*
+    Painel de detalhes pelo mapa (US-14, RF-034, RN-26; plan 16.12). Os campos, as alterações de situação permitidas e a
+    posição vêm prontos da API (D-59, A-38). "Alterar situação" usa os diálogos do Inventário e some quando a lista vem
+    vazia; "Ver histórico" e "Abrir no inventário" dependem de history.view e inventory.view (D-81).
+*@
+<MudPaper Outlined="true" Class="pa-3" data-testid="details-panel">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
+        <MudText Typo="Typo.h6" HtmlTag="h2">Detalhes</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="OnClose" aria-label="Fechar os detalhes" />
+    </MudStack>
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" role="alert">
+            @_error
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="LoadAsync" Class="ml-2">
+                Tentar novamente
+            </MudButton>
+        </MudAlert>
+    }
+    else if (_equipment is null && _agent is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-hidden="true" />
+        <MudText Typo="Typo.body2" Class="mt-2" role="status">Carregando detalhes…</MudText>
+    }
+    else if (_equipment is { } details)
+    {
+        var equipment = details.Equipment;
+        <MudStack Spacing="1">
+            <EquipmentTypeIcon IconKey="@equipment.TypeIcon" Name="@equipment.TypeName" Size="Size.Medium" />
+            <MudText Typo="Typo.subtitle1"><strong>@equipment.SerialNumber</strong></MudText>
+            <MudText Typo="Typo.body2">@equipment.Brand @equipment.Model</MudText>
+            <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                <StatusBadge Status="equipment.Status" />
+                @if (!equipment.IsActive)
+                {
+                    <ActivityBadge IsActive="false" />
+                }
+            </MudStack>
+        </MudStack>
+
+        <dl class="argos-definition mt-3">
+            <dt>Localização</dt>
+            <dd>
+                @if (equipment.Location is { } location)
+                {
+                    <span>@location.Street, @location.NeighborhoodName (@location.RegionName)</span>
+                }
+                else
+                {
+                    <span>Base @equipment.BaseName · @equipment.NeighborhoodName (@equipment.RegionName)</span>
+                    @if (details.CurrentPosition is { } position)
+                    {
+                        <span class="d-block">
+                            Posição atual: @position.Latitude.ToString("0.00000"), @position.Longitude.ToString("0.00000")
+                            às @DisplayTime.FormatTime(position.RecordedAt)
+                        </span>
+                    }
+                }
+            </dd>
+            <dt>Órgão</dt>
+            <dd>@equipment.OrganizationAcronym · @equipment.OrganizationName</dd>
+            @if (equipment.Attributes.Count > 0)
+            {
+                <dt>Características</dt>
+                <dd>
+                    @foreach (var characteristic in equipment.Attributes)
+                    {
+                        <span class="d-block">@characteristic.Label: @characteristic.DisplayValue</span>
+                    }
+                </dd>
+            }
+            <dt>Manutenção</dt>
+            <dd>
+                <MaintenanceNeedBadge Need="equipment.MaintenanceNeed" />
+                @foreach (var maintenance in equipment.OpenMaintenances)
+                {
+                    <span class="d-block">
+                        @InventoryLabels.For(maintenance.Kind)@(maintenance.DueDate is { } due ? $", prevista para {DisplayTime.FormatDate(due)}" : string.Empty)
+                    </span>
+                }
+            </dd>
+            <dt>Última comunicação</dt>
+            <dd data-testid="last-communication">
+                @(details.LastCommunicationAt is { } communication
+                    ? $"Última comunicação: {DisplayTime.FormatDateTimeWithSeconds(communication)}"
+                    : "Nenhuma comunicação recebida")
+            </dd>
+            <dt>Alertas abertos</dt>
+            <dd>
+                @if (details.OpenAlerts.Count == 0)
+                {
+                    <span>Nenhum alerta aberto.</span>
+                }
+                @foreach (var alert in details.OpenAlerts)
+                {
+                    <span class="d-block">
+                        <TokenBadge Token="AlertSeverityTokens.For(alert.Severity)" />
+                        @alert.Title · @(alert.State == AlertState.Open ? "Aberto" : "Reconhecido")
+                    </span>
+                }
+            </dd>
+        </dl>
+
+        <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+            @if (equipment.AllowedStatusChanges.Count > 0)
+            {
+                <AuthorizeView Policy="@Permissions.ResourceStatusChange">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.SwapHoriz" OnClick="() => ChangeEquipmentStatusAsync(equipment)">
+                        Alterar situação
+                    </MudButton>
+                </AuthorizeView>
+            }
+            <AuthorizeView Policy="@Permissions.HistoryView">
+                <MudButton Href="@($"inventory/equipment/{equipment.Id}/history")" Variant="Variant.Outlined" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.History">
+                    Ver histórico
+                </MudButton>
+            </AuthorizeView>
+            <AuthorizeView Policy="@Permissions.InventoryView">
+                <MudButton Href="@($"inventory/equipment/{equipment.Id}")" Variant="Variant.Text" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.OpenInNew">
+                    Abrir no inventário
+                </MudButton>
+            </AuthorizeView>
+        </MudStack>
+    }
+    else if (_agent is { } agent)
+    {
+        <MudStack Spacing="1">
+            <MudText Typo="Typo.subtitle1"><strong>@agent.DisplayName</strong></MudText>
+            <MudText Typo="Typo.body2">@InventoryLabels.For(agent.Role)</MudText>
+            <AgentStatusBadge Status="agent.Status" />
+        </MudStack>
+
+        <dl class="argos-definition mt-3">
+            <dt>Órgão</dt>
+            <dd>@agent.OrganizationAcronym · @agent.OrganizationName</dd>
+            <dt>Base</dt>
+            <dd>@agent.BaseName</dd>
+            <dt>Recurso vinculado</dt>
+            <dd>
+                @(agent.AssignedEquipment is { } assigned
+                    ? $"{assigned.TypeName} · {assigned.SerialNumber}"
+                    : "Nenhum equipamento vinculado")
+            </dd>
+            <dt>Última posição</dt>
+            <dd data-testid="last-position">
+                @(agent.Position is { } agentPosition
+                    ? $"Última posição às {DisplayTime.FormatTime(agentPosition.RecordedAt)}"
+                    : "Nenhuma posição registrada")
+            </dd>
+        </dl>
+
+        <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+            @if (agent.AllowedStatusChanges.Count > 0)
+            {
+                <AuthorizeView Policy="@Permissions.ResourceStatusChange">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.SwapHoriz" OnClick="() => ChangeAgentStatusAsync(agent)">
+                        Alterar situação
+                    </MudButton>
+                </AuthorizeView>
+            }
+            <AuthorizeView Policy="@Permissions.HistoryView">
+                <MudButton Href="@($"inventory/agents/{agent.Id}/history")" Variant="Variant.Outlined" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.History">
+                    Ver histórico
+                </MudButton>
+            </AuthorizeView>
+            <AuthorizeView Policy="@Permissions.InventoryView">
+                <MudButton Href="@($"inventory/agents/{agent.Id}")" Variant="Variant.Text" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.OpenInNew">
+                    Abrir no inventário
+                </MudButton>
+            </AuthorizeView>
+        </MudStack>
+    }
+</MudPaper>
+
+@code {
+    private OperationsEquipmentDetails? _equipment;
+    private OperationsAgentDetails? _agent;
+    private string? _error;
+    private (ResourceKind Kind, Guid Id, int Version)? _loaded;
+
+    [Parameter, EditorRequired]
+    public ResourceKind Kind { get; set; }
+
+    [Parameter, EditorRequired]
+    public Guid Id { get; set; }
+
+    /// <summary>Muda a cada retrato novo da Central, para os detalhes acompanharem a operação.</summary>
+    [Parameter]
+    public int Version { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <summary>Depois de alterar a situação, para a Central buscar um novo retrato.</summary>
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loaded != (Kind, Id, Version))
+        {
+            // Outro recurso: limpa o anterior; o mesmo recurso com retrato novo: mantém e atualiza.
+            if (_loaded is not { } previous || previous.Kind != Kind || previous.Id != Id)
+            {
+                (_equipment, _agent) = (null, null);
+            }
+
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loaded = (Kind, Id, Version);
+        var requested = _loaded;
+        _error = null;
+
+        try
+        {
+            if (Kind == ResourceKind.Equipment)
+            {
+                var details = await Operations.GetEquipmentAsync(Id);
+                if (_loaded == requested)
+                {
+                    _equipment = details;
+                }
+            }
+            else
+            {
+                var details = await Operations.GetAgentAsync(Id);
+                if (_loaded == requested)
+                {
+                    _agent = details;
+                }
+            }
+        }
+        catch (ApiProblemException problem)
+        {
+            _error = problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Verifique a conexão e tente novamente.";
+        }
+    }
+
+    private async Task ChangeEquipmentStatusAsync(EquipmentDetails equipment)
+    {
+        var dialog = await Dialogs.ShowAsync<StatusChangeDialog>(
+            "Alterar situação",
+            new DialogParameters<StatusChangeDialog>
+            {
+                { dialog => dialog.EquipmentId, equipment.Id },
+                { dialog => dialog.Current, equipment.Status },
+                { dialog => dialog.Options, equipment.AllowedStatusChanges },
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        await AfterChangeAsync(dialog);
+    }
+
+    private async Task ChangeAgentStatusAsync(OperationsAgentDetails agent)
+    {
+        var dialog = await Dialogs.ShowAsync<AgentStatusChangeDialog>(
+            "Alterar situação",
+            new DialogParameters<AgentStatusChangeDialog>
+            {
+                { dialog => dialog.AgentId, agent.Id },
+                { dialog => dialog.Current, agent.Status },
+                { dialog => dialog.Options, agent.AllowedStatusChanges },
+            },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        await AfterChangeAsync(dialog);
+    }
+
+    private async Task AfterChangeAsync(IDialogReference dialog)
+    {
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Situação alterada.", Severity.Success);
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
+    }
+}

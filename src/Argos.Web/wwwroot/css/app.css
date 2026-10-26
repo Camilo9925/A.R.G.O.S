@@ -83,18 +83,11 @@ h1:focus {
   letter-spacing: 0.12em;
 }
 
-.argos-operations {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - var(--mud-appbar-height));
-}
-
 .argos-operations-title {
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 0;
 }
 
 .argos-map {
-  flex: 1;
   min-height: 0;
 }
 
@@ -259,4 +252,208 @@ h1:focus {
   text-transform: none;
   font-weight: 600;
   padding-left: 0;
+}
+
+/* ---- Central de Operações (plan 16.12) ---- */
+
+/* Filtros da Central numa linha só em telas largas, para o mapa subir na tela. */
+.argos-filters--compact {
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.5rem;
+}
+
+.argos-operations {
+  height: auto;
+  min-height: calc(100vh - var(--mud-appbar-height));
+  padding-bottom: 1.5rem;
+}
+
+.argos-operations-body {
+  padding: 0 1rem;
+}
+
+.argos-operations-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .argos-operations-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.argos-operations-map .argos-map {
+  height: clamp(26rem, 68vh, 46rem);
+  border: 1px solid var(--mud-palette-lines-default);
+  border-radius: 4px;
+}
+
+.argos-operations-side {
+  max-height: clamp(26rem, 68vh, 46rem);
+  overflow-y: auto;
+}
+
+.argos-indicators {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+}
+
+.argos-indicator-value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Faixa de críticos (US-15, CS-04): fixa no topo, sempre visível, sem rolagem nem clique para aparecer. */
+.argos-critical-strip {
+  position: sticky;
+  top: var(--mud-appbar-height);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+  background: #E5484D;
+  color: #FFFFFF;
+  border-bottom: 3px solid #0B1E3F;
+}
+
+.argos-critical-strip .mud-button-root {
+  color: #FFFFFF;
+  border-color: #FFFFFF;
+}
+
+/* Piscar a 1 Hz até reconhecer; com redução de movimento, contorno grosso fixo (Art. X.3). */
+@keyframes argos-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.35; }
+}
+
+.argos-blink {
+  animation: argos-blink 1s steps(1, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .argos-blink {
+    animation: none;
+    outline: 4px solid currentColor;
+    outline-offset: 1px;
+  }
+}
+
+.argos-alert {
+  border-left: 6px solid var(--argos-badge-color);
+}
+
+.argos-alert--clickable {
+  cursor: pointer;
+}
+
+.argos-alert--clickable:hover,
+.argos-alert--clickable:focus-visible {
+  background: var(--mud-palette-action-default-hover);
+}
+
+.argos-alert--selected {
+  outline: 2px solid #00C2FF;
+}
+
+/* Marcadores do mapa: ícone do tipo ou da função sobre a cor da situação; o selo traz o ícone da situação. */
+.argos-marker {
+  background: transparent;
+  border: none;
+}
+
+.argos-poi {
+  position: relative;
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
+  margin: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--argos-marker-color);
+  color: #0B1E3F;
+  border: 2px solid #0B1E3F;
+  box-shadow: 0 0 0 2px #E8EEF5;
+}
+
+.argos-poi--outlined {
+  background: var(--mud-palette-surface);
+  color: var(--mud-palette-text-primary);
+  border: 3px dashed var(--argos-marker-color);
+  box-shadow: 0 0 0 1px #0B1E3F;
+}
+
+.argos-poi--alert {
+  box-shadow: 0 0 0 4px var(--argos-alert-color);
+}
+
+.argos-poi--agent {
+  background: #0B1E3F;
+  color: #00C2FF;
+  border: 3px solid #00C2FF;
+}
+
+.argos-poi-badge {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #0B1E3F;
+  color: var(--argos-marker-color);
+  box-shadow: 0 0 0 1px #E8EEF5;
+}
+
+.argos-cluster {
+  background: transparent;
+  border: none;
+}
+
+.argos-cluster-box {
+  position: relative;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  margin: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--argos-marker-color);
+  color: #0B1E3F;
+  border: 3px solid #0B1E3F;
+  box-shadow: 0 0 0 2px #E8EEF5;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.argos-cluster-badge {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #0B1E3F;
+  color: var(--argos-marker-color);
+  box-shadow: 0 0 0 1px #E8EEF5;
+}
+
+.argos-map-legend {
+  margin-bottom: 0.75rem;
 }

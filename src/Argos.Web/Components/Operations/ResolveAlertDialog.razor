@@ -1,0 +1,58 @@
+@inject OperationsClient Operations
+
+@*
+    Resolver alerta (RF-036, RN-20): a observação é obrigatória e o erro volta da API, no campo. Resolver um crítico ainda
+    não reconhecido é recusado pela API (409); a tela nem oferece essa ação (allowedActions, D-59).
+*@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Resolver alerta</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body2">@Alert.Title · @Alert.ResourceLabel</MudText>
+            <MudTextField @bind-Value="_notes"
+                          Label="Observação"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          MaxLength="500"
+                          Required="true"
+                          Immediate="true"
+                          Error="@_errors.Has("notes")"
+                          ErrorText="@_errors.For("notes")" />
+            <SaveErrorAlert Message="@_error" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitAsync" Disabled="_saving">
+            @(_saving ? "Salvando…" : "Resolver")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly FieldErrors _errors = new();
+    private string? _notes;
+    private string? _error;
+    private bool _saving;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public AlertSummary Alert { get; set; } = null!;
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        (_error, var resolved) = await SaveForm.RunAsync(
+            _errors, ["notes"], () => Operations.ResolveAsync(Alert.Id, new ResolveAlertRequest { Notes = _notes }));
+        _saving = false;
+
+        if (resolved is not null)
+        {
+            Dialog.Close(DialogResult.Ok(resolved));
+        }
+    }
+}

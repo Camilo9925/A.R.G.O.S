@@ -1,0 +1,26 @@
+@* "Agentes em atividade por região" (RF-032): vale para todos os perfis, inclusive o Gestor (D-10, RN-27); vem pronta da API. *@
+<MudPaper Outlined="true" Class="pa-2">
+    <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mb-1">Agentes em atividade por região</MudText>
+    <MudSimpleTable Dense="true" Hover="true" Style="overflow-x: auto" aria-label="Agentes em atividade por região">
+        <thead>
+            <tr>
+                <th>Região</th>
+                <th>Agentes em atividade</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var region in Regions)
+            {
+                <tr>
+                    <td>@region.RegionName</td>
+                    <td>@region.AgentsInActivity</td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<RegionAgentCount> Regions { get; set; } = [];
+}

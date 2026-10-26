@@ -1,0 +1,67 @@
+@* Legenda do mapa (RF-029): situações, funções, tipos e gravidades, sempre ao alcance, com texto e ícone além da cor (Art. X.2, XI.2). *@
+<MudExpansionPanels Elevation="0" Outlined="true" Class="argos-map-legend">
+    <MudExpansionPanel Text="Legenda do mapa">
+        <MudStack Spacing="2">
+            <div>
+                <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mb-1">Situação do equipamento</MudText>
+                <div class="argos-legend">
+                    @foreach (var (_, token) in StatusTokens.All)
+                    {
+                        <TokenBadge Token="token" />
+                    }
+                </div>
+                <MudText Typo="Typo.caption">
+                    Ainda não instalado aparece vazado e tracejado. O contorno colorido em volta do marcador indica alerta aberto.
+                </MudText>
+            </div>
+            @if (AgentsVisible)
+            {
+                <div>
+                    <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mb-1">Agentes em atividade</MudText>
+                    <div class="argos-legend">
+                        @foreach (var (_, token) in AgentRoleTokens.All)
+                        {
+                            <TokenBadge Token="token" />
+                        }
+                    </div>
+                    <div class="argos-legend mt-1">
+                        @foreach (var (_, token) in AgentStatusTokens.All)
+                        {
+                            <TokenBadge Token="token" />
+                        }
+                    </div>
+                </div>
+            }
+            <div>
+                <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mb-1">Tipos de equipamento</MudText>
+                <div class="argos-legend">
+                    @foreach (var type in Types)
+                    {
+                        <EquipmentTypeIcon IconKey="@type.Icon" Name="@type.Name" />
+                    }
+                </div>
+            </div>
+            <div>
+                <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mb-1">Gravidade dos alertas</MudText>
+                <div class="argos-legend">
+                    @foreach (var (_, token) in AlertSeverityTokens.All)
+                    {
+                        <TokenBadge Token="token" />
+                    }
+                </div>
+            </div>
+            <MudText Typo="Typo.caption">
+                Com o mapa afastado, os marcadores se agrupam: o número é a quantidade, e a cor e o ícone são os da pior situação do grupo.
+            </MudText>
+        </MudStack>
+    </MudExpansionPanel>
+</MudExpansionPanels>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<EquipmentTypeData> Types { get; set; } = [];
+
+    /// <summary>Funções e situações de agente só aparecem para quem vê agentes no mapa (RN-27).</summary>
+    [Parameter]
+    public bool AgentsVisible { get; set; }
+}

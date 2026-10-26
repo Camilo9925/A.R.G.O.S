@@ -1,0 +1,145 @@
+@inject OperationsClient Operations
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject DisplayTime DisplayTime
+
+@*
+    Alertas abertos (US-15, RF-035 a RF-037; plan 16.12) na ordem da API (gravidade, depois horário). "Reconhecer" e
+    "Resolver" aparecem só conforme allowedActions (RN-20; D-59): a Web não repete a regra. Clicar no alerta centraliza
+    o mapa no recurso e abre os detalhes.
+*@
+<MudStack Spacing="2">
+    <MudText Typo="Typo.h6" HtmlTag="h2">Alertas abertos (@Alerts.Count)</MudText>
+    @if (Alerts.Count == 0)
+    {
+        <MudText Typo="Typo.body2" role="status">Nenhum alerta aberto.</MudText>
+    }
+    else
+    {
+        @foreach (var alert in Alerts)
+        {
+            var severity = AlertSeverityTokens.For(alert.Severity);
+            var isOpen = alert.State == AlertState.Open;
+            <MudPaper Outlined="true" Class="@($"pa-2 argos-alert{(SelectedResourceId == alert.ResourceId ? " argos-alert--selected" : string.Empty)}")"
+                      Style="@($"--argos-badge-color: {severity.Color}")" data-alert-id="@alert.Id">
+                <div class="argos-alert--clickable" role="button" tabindex="0"
+                     aria-label="@($"Ver {alert.ResourceLabel} no mapa")"
+                     @onclick="() => OnSelect.InvokeAsync(alert)"
+                     @onkeydown="args => KeyDownAsync(args, alert)">
+                    <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center">
+                        <span class="@(isOpen ? "argos-blink" : null)"><TokenBadge Token="severity" /></span>
+                        <MudText Typo="Typo.subtitle2">@alert.Title</MudText>
+                        @if (alert.OutsideFilter)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.FilterAlt">Fora do filtro</MudChip>
+                        }
+                        @if (!alert.ResourceIsActive)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Outlined.DoNotDisturbOn">Cadastro inativo</MudChip>
+                        }
+                    </MudStack>
+                    <MudText Typo="Typo.body2">@alert.ResourceLabel · @alert.NeighborhoodName (@alert.RegionName)</MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">
+                        Aberto às @DisplayTime.FormatTime(alert.OpenedAt)
+                        · última ocorrência às @DisplayTime.FormatTime(alert.LastOccurredAt)
+                        · @alert.OccurrenceCount @(alert.OccurrenceCount == 1 ? "ocorrência" : "ocorrências")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Class="d-block">
+                        @if (isOpen)
+                        {
+                            <strong>Aberto</strong>
+                        }
+                        else
+                        {
+                            <strong>Reconhecido</strong>
+                            @if (alert.AcknowledgedAt is { } at)
+                            {
+                                <span> por @alert.AcknowledgedBy às @DisplayTime.FormatTime(at)</span>
+                            }
+                        }
+                    </MudText>
+                </div>
+                @if (alert.AllowedActions.Count > 0)
+                {
+                    <MudStack Row="true" Spacing="1" Class="mt-1">
+                        @if (alert.AllowedActions.Contains(AlertAction.Acknowledge))
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" Disabled="_busy"
+                                       StartIcon="@Icons.Material.Filled.Visibility" OnClick="() => AcknowledgeAsync(alert)">
+                                Reconhecer
+                            </MudButton>
+                        }
+                        @if (alert.AllowedActions.Contains(AlertAction.Resolve))
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" Disabled="_busy"
+                                       StartIcon="@Icons.Material.Filled.TaskAlt" OnClick="() => ResolveAsync(alert)">
+                                Resolver
+                            </MudButton>
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+        }
+    }
+</MudStack>
+
+@code {
+    private bool _busy;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<AlertSummary> Alerts { get; set; } = [];
+
+    /// <summary>Recurso aberto nos detalhes, para destacar o alerta dele.</summary>
+    [Parameter]
+    public Guid? SelectedResourceId { get; set; }
+
+    [Parameter]
+    public EventCallback<AlertSummary> OnSelect { get; set; }
+
+    /// <summary>Depois de reconhecer ou resolver, para a Central buscar um novo retrato.</summary>
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    private Task KeyDownAsync(KeyboardEventArgs args, AlertSummary alert) =>
+        args.Key is "Enter" or " " ? OnSelect.InvokeAsync(alert) : Task.CompletedTask;
+
+    private async Task AcknowledgeAsync(AlertSummary alert)
+    {
+        _busy = true;
+        try
+        {
+            await Operations.AcknowledgeAsync(alert.Id);
+            Snackbar.Add("Alerta reconhecido.", Severity.Success);
+        }
+        catch (ApiProblemException problem)
+        {
+            Snackbar.Add(problem.Message, Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("Não foi possível falar com o servidor. Tente novamente.", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ResolveAsync(AlertSummary alert)
+    {
+        var dialog = await Dialogs.ShowAsync<ResolveAlertDialog>(
+            "Resolver alerta",
+            new DialogParameters<ResolveAlertDialog> { { dialog => dialog.Alert, alert } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Alerta resolvido.", Severity.Success);
+        }
+
+        // Também depois de cancelar: um 409 do diálogo pode indicar que o alerta já mudou.
+        await OnChanged.InvokeAsync();
+    }
+}

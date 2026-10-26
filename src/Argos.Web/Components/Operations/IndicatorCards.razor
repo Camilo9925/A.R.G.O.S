@@ -1,0 +1,58 @@
+@using System.Globalization
+@inject DisplayTime DisplayTime
+
+@*
+    Indicadores (US-12, RF-032): tudo vem calculado pela API sobre as mesmas linhas filtradas do mapa (D-59); aqui só
+    se mostra.
+*@
+<MudStack Spacing="1" Class="mb-3">
+    <div class="argos-indicators" role="group" aria-label="Indicadores">
+        <MudPaper Outlined="true" Class="pa-2">
+            <MudText Typo="Typo.caption">Total de equipamentos</MudText>
+            <MudText Typo="Typo.h5" Class="argos-indicator-value" data-testid="indicator-total">@Indicators.TotalEquipment</MudText>
+        </MudPaper>
+        <MudPaper Outlined="true" Class="pa-2">
+            <MudText Typo="Typo.caption">Operacionais</MudText>
+            <MudText Typo="Typo.h5" Class="argos-indicator-value" data-testid="indicator-operational">@Indicators.Operational</MudText>
+        </MudPaper>
+        <MudPaper Outlined="true" Class="pa-2">
+            <MudText Typo="Typo.caption">Indisponíveis</MudText>
+            <MudText Typo="Typo.h5" Class="argos-indicator-value" data-testid="indicator-unavailable">@Indicators.Unavailable</MudText>
+        </MudPaper>
+        <MudPaper Outlined="true" Class="pa-2">
+            <MudText Typo="Typo.caption">Disponibilidade</MudText>
+            <MudText Typo="Typo.h5" Class="argos-indicator-value" data-testid="indicator-availability">@FormatAvailability()</MudText>
+        </MudPaper>
+        <MudPaper Outlined="true" Class="pa-2">
+            <MudText Typo="Typo.caption">Agentes em atividade</MudText>
+            <MudText Typo="Typo.h5" Class="argos-indicator-value" data-testid="indicator-agents">@Indicators.AgentsInActivity</MudText>
+        </MudPaper>
+        <MudPaper Outlined="true" Class="pa-2">
+            <MudText Typo="Typo.caption">Alertas abertos</MudText>
+            <div class="argos-legend mt-1">
+                @foreach (var (severity, token) in AlertSeverityTokens.All)
+                {
+                    <span class="argos-badge" style="@($"--argos-badge-color: {token.Color}")">
+                        <MudIcon Icon="@token.Icon" Size="Size.Small" aria-hidden="true" Class="argos-badge-icon" />
+                        <span>@token.Label: @CountOf(severity)</span>
+                    </span>
+                }
+            </div>
+        </MudPaper>
+    </div>
+    <MudText Typo="Typo.caption" role="status">Atualizado às @DisplayTime.FormatTime(GeneratedAt)</MudText>
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired]
+    public OperationsIndicators Indicators { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public DateTimeOffset GeneratedAt { get; set; }
+
+    private int CountOf(AlertSeverity severity) =>
+        Indicators.OpenAlertsBySeverity.FirstOrDefault(count => count.Severity == severity)?.Count ?? 0;
+
+    private string FormatAvailability() =>
+        Indicators.AvailabilityPercent is { } percent ? $"{percent.ToString("0.0", CultureInfo.CurrentCulture)}%" : "—";
+}

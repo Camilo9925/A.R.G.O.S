@@ -1,13 +1,454 @@
 @page "/"
 @page "/operations"
 
-@using Argos.Web.Components.Map
-
 @attribute [Authorize(Policy = Permissions.OperationsView)]
+@implements IDisposable
+@inject OperationsClient Operations
+@inject InventoryReferenceClient Reference
+@inject NavigationManager Navigation
+@inject RealtimeConnection Realtime
 
+@*
+    Central de Operações (US-11 a US-15; plan 16.12). O retrato vem da API já filtrado, ordenado e com os números
+    calculados (D-59); a página só o mostra. Os filtros ficam na URL, a única fonte do estado. O retrato é buscado na
+    abertura, a cada mudança de filtros, 1 s depois de OperationsChanged e na reconexão; as posições andam pelo tempo
+    real, sem recarregar (D-80, D-84).
+*@
 <PageTitle>Central de Operações · ARGOS</PageTitle>
 
 <div class="argos-operations">
-    <MudText Typo="Typo.h5" HtmlTag="h1" Class="argos-operations-title">Central de Operações</MudText>
-    <ArgosMap />
+    <CriticalAlertsBanner Critical="CriticalAlerts" OnShowOnMap="SelectAlertAsync" />
+
+    <div class="argos-operations-body">
+        <MudText Typo="Typo.h5" HtmlTag="h1" Class="argos-operations-title">Central de Operações</MudText>
+
+        <MudPaper Outlined="true" Class="pa-2 mb-2">
+            <div class="argos-filters argos-filters--compact">
+                <MudSelect T="Guid" MultiSelection="true" Label="Tipo" Variant="Variant.Outlined" Dense="true"
+                           SelectedValues="Selected(TypeId)" SelectedValuesChanged="values => FilterAsync(TypeKey, values)"
+                           ToStringFunc="@(id => _types.FirstOrDefault(type => type.Id == id)?.Name ?? string.Empty)">
+                    @foreach (var type in _types)
+                    {
+                        <MudSelectItem T="Guid" Value="@type.Id">@type.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="EquipmentStatus" MultiSelection="true" Label="Situação" Variant="Variant.Outlined" Dense="true"
+                           SelectedValues="Parsed<EquipmentStatus>(Status)" SelectedValuesChanged="values => FilterAsync(StatusKey, values)"
+                           ToStringFunc="@(status => InventoryLabels.For(status))">
+                    @foreach (var (status, _) in StatusTokens.All)
+                    {
+                        <MudSelectItem T="EquipmentStatus" Value="@status">@InventoryLabels.For(status)</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="MaintenanceNeed" MultiSelection="true" Label="Necessidade de manutenção" Variant="Variant.Outlined"
+                           Dense="true" SelectedValues="Parsed<MaintenanceNeed>(MaintenanceNeed)"
+                           SelectedValuesChanged="values => FilterAsync(NeedKey, values)"
+                           ToStringFunc="@(need => InventoryLabels.For(need))">
+                    @foreach (var (need, _) in MaintenanceNeedTokens.All)
+                    {
+                        <MudSelectItem T="MaintenanceNeed" Value="@need">@InventoryLabels.For(need)</MudSelectItem>
+                    }
+                </MudSelect>
+                @* A função do agente só existe para quem vê agentes no mapa (RN-27). *@
+                <AuthorizeView Policy="@Permissions.AgentPositionsView">
+                    <MudSelect T="AgentRole" MultiSelection="true" Label="Função do agente" Variant="Variant.Outlined" Dense="true"
+                               SelectedValues="Parsed<AgentRole>(AgentRoleFilter)" SelectedValuesChanged="values => FilterAsync(AgentRoleKey, values)"
+                               ToStringFunc="@(role => InventoryLabels.For(role))">
+                        @foreach (var (role, _) in AgentRoleTokens.All)
+                        {
+                            <MudSelectItem T="AgentRole" Value="@role">@InventoryLabels.For(role)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </AuthorizeView>
+                <MudSelect T="Guid" MultiSelection="true" Label="Órgão" Variant="Variant.Outlined" Dense="true"
+                           SelectedValues="Selected(OrganizationId)" SelectedValuesChanged="values => FilterAsync(OrganizationKey, values)"
+                           ToStringFunc="@(id => _organizations.FirstOrDefault(organization => organization.Id == id)?.Acronym ?? string.Empty)">
+                    @foreach (var organization in _organizations)
+                    {
+                        <MudSelectItem T="Guid" Value="@organization.Id">@organization.Acronym · @organization.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="Guid" MultiSelection="true" Label="Região" Variant="Variant.Outlined" Dense="true"
+                           SelectedValues="Selected(RegionId)" SelectedValuesChanged="values => FilterAsync(RegionKey, values)"
+                           ToStringFunc="@(id => _regions.FirstOrDefault(region => region.Id == id)?.Name ?? string.Empty)">
+                    @foreach (var region in _regions)
+                    {
+                        <MudSelectItem T="Guid" Value="@region.Id">@region.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="Guid" MultiSelection="true" Label="Bairro" Variant="Variant.Outlined" Dense="true"
+                           SelectedValues="Selected(NeighborhoodId)" SelectedValuesChanged="values => FilterAsync(NeighborhoodKey, values)"
+                           ToStringFunc="@(id => _neighborhoods.FirstOrDefault(neighborhood => neighborhood.Id == id)?.Name ?? string.Empty)">
+                    @foreach (var neighborhood in _neighborhoods)
+                    {
+                        <MudSelectItem T="Guid" Value="@neighborhood.Id">@neighborhood.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
+        </MudPaper>
+
+        <ActiveFiltersBar Filters="ActiveFilters" OnRemove="RemoveFilterAsync" OnClear="ClearFiltersAsync" />
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" role="alert" Class="mb-3">
+                @_error
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="() => LoadAsync()" Class="ml-2">
+                    Tentar novamente
+                </MudButton>
+            </MudAlert>
+        }
+
+        @if (Realtime.State is RealtimeConnectionState.Interrupted or RealtimeConnectionState.Reconnecting)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" role="alert" Class="mb-3"
+                      Icon="@Icons.Material.Filled.CloudOff">
+                Tempo real interrompido: o que aparece pode estar desatualizado. A Central busca um novo retrato assim que reconectar.
+            </MudAlert>
+        }
+
+        @if (_snapshot is null)
+        {
+            @if (_error is null)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-hidden="true" />
+                <MudText Typo="Typo.body2" Class="mt-2 mb-3" role="status">Carregando a Central…</MudText>
+            }
+        }
+        else
+        {
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-hidden="true" Class="mb-2" />
+            }
+
+            <IndicatorCards Indicators="_snapshot.Indicators" GeneratedAt="_snapshot.GeneratedAt" />
+
+            @if (_snapshot.Equipment.Count == 0 && _snapshot.Agents.Count == 0)
+            {
+                <div class="mb-3">
+                    <EmptyState Title="Nenhum recurso com esses filtros.">
+                        @if (ActiveFilters.Count > 0)
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FilterAltOff"
+                                       OnClick="ClearFiltersAsync">
+                                Limpar filtros
+                            </MudButton>
+                        }
+                    </EmptyState>
+                </div>
+            }
+        }
+
+        <div class="argos-operations-grid">
+            <div class="argos-operations-map">
+                <OperationsLegend Types="_types" AgentsVisible="_snapshot?.AgentPositionsVisible ?? false" />
+                <ArgosMap @ref="_map" Markers="_markers" OnMarkerClick="OnMarkerClickedAsync" />
+                @if (_snapshot is not null)
+                {
+                    <div class="mt-3">
+                        <RegionAgentsTable Regions="_snapshot.Indicators.AgentsInActivityByRegion" />
+                    </div>
+                }
+            </div>
+            <div class="argos-operations-side">
+                <MudStack Spacing="3">
+                    @if (_selected is { } selected)
+                    {
+                        <OperationsDetailsPanel Kind="selected.Kind" Id="selected.Id" Version="_version"
+                                                OnClose="CloseDetails" OnChanged="() => LoadAsync(silent: true)" />
+                    }
+                    @if (_snapshot is not null)
+                    {
+                        <AlertsPanel Alerts="_snapshot.Alerts" SelectedResourceId="_selected?.Id"
+                                     OnSelect="SelectAlertAsync" OnChanged="() => LoadAsync(silent: true)" />
+                    }
+                </MudStack>
+            </div>
+        </div>
+    </div>
 </div>
+
+@code {
+    private const string TypeKey = "typeId";
+    private const string StatusKey = "status";
+    private const string NeedKey = "maintenanceNeed";
+    private const string AgentRoleKey = "agentRole";
+    private const string OrganizationKey = "organizationId";
+    private const string RegionKey = "regionId";
+    private const string NeighborhoodKey = "neighborhoodId";
+
+    private static readonly TimeSpan ReloadDelay = TimeSpan.FromSeconds(1);
+
+    private IReadOnlyList<EquipmentTypeData> _types = [];
+    private IReadOnlyList<OrganizationData> _organizations = [];
+    private IReadOnlyList<RegionData> _regions = [];
+    private IReadOnlyList<NeighborhoodData> _neighborhoods = [];
+    private OperationsSnapshot? _snapshot;
+    private IReadOnlyList<MapMarker>? _markers;
+    private ArgosMap? _map;
+    private (ResourceKind Kind, Guid Id)? _selected;
+    private string? _error;
+    private bool _loading;
+    private bool _reloadScheduled;
+    private bool _disposed;
+    private int _version;
+    private int _loadSequence;
+    private string? _loadedUri;
+    private RealtimeConnectionState _realtimeState;
+
+    [SupplyParameterFromQuery(Name = TypeKey)] public Guid[]? TypeId { get; set; }
+    [SupplyParameterFromQuery(Name = StatusKey)] public string[]? Status { get; set; }
+    [SupplyParameterFromQuery(Name = NeedKey)] public string[]? MaintenanceNeed { get; set; }
+    [SupplyParameterFromQuery(Name = AgentRoleKey)] public string[]? AgentRoleFilter { get; set; }
+    [SupplyParameterFromQuery(Name = OrganizationKey)] public Guid[]? OrganizationId { get; set; }
+    [SupplyParameterFromQuery(Name = RegionKey)] public Guid[]? RegionId { get; set; }
+    [SupplyParameterFromQuery(Name = NeighborhoodKey)] public Guid[]? NeighborhoodId { get; set; }
+
+    private IReadOnlyList<AlertSummary> CriticalAlerts =>
+        _snapshot?.Alerts.Where(alert => alert.Severity == AlertSeverity.Critical).ToArray() ?? [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _realtimeState = Realtime.State;
+        Realtime.Changed += OnRealtimeStateChanged;
+        Realtime.TelemetryReceived += OnTelemetry;
+        Realtime.AgentPositionsReceived += OnAgentPositions;
+        Realtime.OperationsChangedReceived += OnOperationsChanged;
+        Realtime.Reconnected += OnReconnected;
+
+        try
+        {
+            var types = Reference.ListEquipmentTypesAsync();
+            var organizations = Reference.ListOrganizationsAsync();
+            var regions = Reference.ListRegionsAsync();
+            var neighborhoods = Reference.ListNeighborhoodsAsync();
+            (_types, _organizations, _regions, _neighborhoods) = (await types, await organizations, await regions, await neighborhoods);
+        }
+        catch (Exception exception) when (exception is ApiProblemException or HttpRequestException)
+        {
+            _error = "Não foi possível carregar as listas dos filtros. Tente novamente.";
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // A URL mudou (filtro, voltar do navegador): busca o retrato uma vez por URL.
+        if (Navigation.Uri != _loadedUri)
+        {
+            _loadedUri = Navigation.Uri;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync(bool silent = false)
+    {
+        var sequence = ++_loadSequence;
+        _loading = !silent;
+        _error = null;
+
+        try
+        {
+            var snapshot = await Operations.GetSnapshotAsync(new OperationsSnapshotQuery
+            {
+                TypeId = [.. TypeId ?? []],
+                Status = [.. Parsed<EquipmentStatus>(Status)],
+                MaintenanceNeed = [.. Parsed<MaintenanceNeed>(MaintenanceNeed)],
+                AgentRole = [.. Parsed<AgentRole>(AgentRoleFilter)],
+                OrganizationId = [.. OrganizationId ?? []],
+                RegionId = [.. RegionId ?? []],
+                NeighborhoodId = [.. NeighborhoodId ?? []],
+            });
+
+            // Uma resposta mais antiga que um pedido posterior (filtros trocados, reconexão) não vale.
+            if (sequence != _loadSequence || _disposed)
+            {
+                return;
+            }
+
+            _snapshot = snapshot;
+            _markers = OperationsMarkers.From(snapshot);
+            _version++;
+            Realtime.NoteTelemetry(snapshot.LastTelemetryAt);
+        }
+        catch (ApiProblemException problem)
+        {
+            _error = problem.IsValidation
+                ? "Os filtros da URL são inválidos. Limpe os filtros e tente de novo."
+                : problem.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Não foi possível falar com o servidor. Verifique a conexão e tente novamente.";
+        }
+        finally
+        {
+            if (sequence == _loadSequence)
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    /// <summary>Só a mudança de estado da conexão redesenha a página; cada lote de telemetria só mexe no indicador do cabeçalho.</summary>
+    private void OnRealtimeStateChanged()
+    {
+        if (Realtime.State != _realtimeState)
+        {
+            _realtimeState = Realtime.State;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void OnTelemetry(TelemetryBatchProcessed message) => InvokeAsync(() =>
+        _map?.UpdatePositionsAsync(
+        [
+            .. message.EquipmentPositions.Select(position =>
+                new MapPositionUpdate(OperationsMarkers.EquipmentKey(position.EquipmentId), position.Latitude, position.Longitude)),
+        ]) ?? Task.CompletedTask);
+
+    private void OnAgentPositions(AgentPositionsUpdated message) => InvokeAsync(() =>
+        _map?.UpdatePositionsAsync(
+        [
+            .. message.Positions.Select(position =>
+                new MapPositionUpdate(OperationsMarkers.AgentKey(position.AgentId), position.Latitude, position.Longitude)),
+            .. message.CrewEquipmentPositions.Select(position =>
+                new MapPositionUpdate(OperationsMarkers.EquipmentKey(position.EquipmentId), position.Latitude, position.Longitude)),
+        ]) ?? Task.CompletedTask);
+
+    /// <summary>Uma espera de 1 s agrupa várias mudanças seguidas num só retrato novo (D-80, CS-02).</summary>
+    private void OnOperationsChanged(OperationsChanged message) => _ = InvokeAsync(async () =>
+    {
+        if (_reloadScheduled || _disposed)
+        {
+            return;
+        }
+
+        _reloadScheduled = true;
+        await Task.Delay(ReloadDelay);
+        _reloadScheduled = false;
+
+        if (!_disposed)
+        {
+            await LoadAsync(silent: true);
+            StateHasChanged();
+        }
+    });
+
+    /// <summary>Reconectou: o que aconteceu enquanto a conexão estava fora só se recupera com um retrato novo (RF-042).</summary>
+    private void OnReconnected() => _ = InvokeAsync(async () =>
+    {
+        await LoadAsync(silent: true);
+        StateHasChanged();
+    });
+
+    private Task OnMarkerClickedAsync(string key)
+    {
+        if (key.StartsWith(OperationsMarkers.EquipmentPrefix, StringComparison.Ordinal)
+            && Guid.TryParse(key.AsSpan(OperationsMarkers.EquipmentPrefix.Length), out var equipmentId))
+        {
+            _selected = (ResourceKind.Equipment, equipmentId);
+        }
+        else if (key.StartsWith(OperationsMarkers.AgentPrefix, StringComparison.Ordinal)
+            && Guid.TryParse(key.AsSpan(OperationsMarkers.AgentPrefix.Length), out var agentId))
+        {
+            _selected = (ResourceKind.Agent, agentId);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Clicar no alerta centraliza o mapa no recurso e abre os detalhes dele (RF-037).</summary>
+    private async Task SelectAlertAsync(AlertSummary alert)
+    {
+        _selected = (alert.ResourceKind, alert.ResourceId);
+        var key = alert.ResourceKind == ResourceKind.Equipment
+            ? OperationsMarkers.EquipmentKey(alert.ResourceId)
+            : OperationsMarkers.AgentKey(alert.ResourceId);
+
+        if (_map is not null)
+        {
+            await _map.FocusOnAsync(alert.Latitude, alert.Longitude, key);
+        }
+    }
+
+    private void CloseDetails() => _selected = null;
+
+    private IReadOnlyList<ActiveFilter> ActiveFilters
+    {
+        get
+        {
+            var filters = new List<ActiveFilter>();
+            Add(TypeKey, TypeId, id => $"Tipo: {_types.FirstOrDefault(type => type.Id == id)?.Name ?? "…"}");
+            Add(StatusKey, Parsed<EquipmentStatus>(Status), status => $"Situação: {InventoryLabels.For(status)}");
+            Add(NeedKey, Parsed<MaintenanceNeed>(MaintenanceNeed), need => $"Manutenção: {InventoryLabels.For(need)}");
+            Add(AgentRoleKey, Parsed<AgentRole>(AgentRoleFilter), role => $"Função: {InventoryLabels.For(role)}");
+            Add(OrganizationKey, OrganizationId,
+                id => $"Órgão: {_organizations.FirstOrDefault(organization => organization.Id == id)?.Acronym ?? "…"}");
+            Add(RegionKey, RegionId, id => $"Região: {_regions.FirstOrDefault(region => region.Id == id)?.Name ?? "…"}");
+            Add(NeighborhoodKey, NeighborhoodId,
+                id => $"Bairro: {_neighborhoods.FirstOrDefault(neighborhood => neighborhood.Id == id)?.Name ?? "…"}");
+            return filters;
+
+            void Add<T>(string key, IEnumerable<T>? values, Func<T, string> label)
+            {
+                foreach (var value in values ?? [])
+                {
+                    filters.Add(new ActiveFilter(key, value!.ToString()!, label(value)));
+                }
+            }
+        }
+    }
+
+    private static IReadOnlyCollection<Guid> Selected(Guid[]? values) => values ?? [];
+
+    private static IReadOnlyCollection<T> Parsed<T>(string[]? values)
+        where T : struct, Enum =>
+        (values ?? []).Select(value => Enum.TryParse<T>(value, ignoreCase: true, out var parsed) ? (T?)parsed : null)
+            .OfType<T>()
+            .ToArray();
+
+    private Task FilterAsync<T>(string key, IEnumerable<T>? values)
+    {
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            [key] = values?.Select(value => value!.ToString()).ToArray() is { Length: > 0 } array ? array : null,
+        }));
+        return Task.CompletedTask;
+    }
+
+    private Task RemoveFilterAsync(ActiveFilter filter)
+    {
+        var remaining = new Uri(Navigation.Uri).Query.TrimStart('?')
+            .Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Select(pair => pair.Split('=', 2))
+            .Where(pair => Uri.UnescapeDataString(pair[0]) == filter.Key)
+            .Select(pair => Uri.UnescapeDataString(pair.ElementAtOrDefault(1) ?? string.Empty))
+            .Where(value => !string.Equals(value, filter.Value, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(
+            new Dictionary<string, object?> { [filter.Key] = remaining.Length > 0 ? remaining : null }));
+        return Task.CompletedTask;
+    }
+
+    private Task ClearFiltersAsync()
+    {
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            [TypeKey] = null, [StatusKey] = null, [NeedKey] = null, [AgentRoleKey] = null,
+            [OrganizationKey] = null, [RegionKey] = null, [NeighborhoodKey] = null,
+        }));
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        Realtime.Changed -= OnRealtimeStateChanged;
+        Realtime.TelemetryReceived -= OnTelemetry;
+        Realtime.AgentPositionsReceived -= OnAgentPositions;
+        Realtime.OperationsChangedReceived -= OnOperationsChanged;
+        Realtime.Reconnected -= OnReconnected;
+    }
+}

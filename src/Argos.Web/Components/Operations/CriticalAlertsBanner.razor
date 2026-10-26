@@ -1,0 +1,41 @@
+@inject DisplayTime DisplayTime
+
+@*
+    Faixa de críticos (US-15, CS-04, Art. VII.2): fixa no topo, sempre visível, sem rolagem, filtro nem clique, inclusive
+    com críticos fora do filtro. Pisca enquanto houver crítico por reconhecer; some só quando não há crítico aberto.
+    A lista já vem ordenada pela API: o primeiro crítico é o mais recente.
+*@
+@if (Critical.Count > 0)
+{
+    var latest = Critical[0];
+    var unacknowledged = Critical.Any(alert => alert.State == AlertState.Open);
+    <div class="argos-critical-strip" role="alert" aria-live="assertive" data-testid="critical-strip">
+        <span class="@(unacknowledged ? "argos-blink" : null)">
+            <MudIcon Icon="@AlertSeverityTokens.Critical.Icon" Size="Size.Medium" aria-hidden="true" />
+        </span>
+        <MudText Typo="Typo.subtitle1" Class="@(unacknowledged ? "argos-blink" : null)">
+            <strong>@Critical.Count @(Critical.Count == 1 ? "alerta crítico aberto" : "alertas críticos abertos")</strong>
+        </MudText>
+        <MudText Typo="Typo.body2">
+            Mais recente: @latest.Title · @latest.ResourceLabel · @latest.NeighborhoodName (@latest.RegionName)
+            · @DisplayTime.FormatTime(latest.LastOccurredAt)
+            @if (latest.OutsideFilter)
+            {
+                <span> · fora do filtro</span>
+            }
+        </MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.MyLocation"
+                   OnClick="() => OnShowOnMap.InvokeAsync(latest)">
+            Ver no mapa
+        </MudButton>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<AlertSummary> Critical { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<AlertSummary> OnShowOnMap { get; set; }
+}

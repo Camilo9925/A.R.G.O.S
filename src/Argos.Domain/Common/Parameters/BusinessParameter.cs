@@ -8,6 +8,18 @@ public enum BusinessParameter
 {
     /// <summary>Prazo, em dias, para uma manutenção ser considerada próxima (RN-10).</summary>
     MaintenanceUpcomingWindowDays,
+
+    /// <summary>Semanas de histórico mínimas para a previsão de uma região (RN-29).</summary>
+    PredictiveMinimumHistoryWeeks,
+
+    /// <summary>Índice a partir do qual o risco é Moderado (RN-30).</summary>
+    RiskModerateFrom,
+
+    /// <summary>Índice a partir do qual o risco é Alto (RN-30).</summary>
+    RiskHighFrom,
+
+    /// <summary>Índice a partir do qual o risco é Muito alto (RN-30).</summary>
+    RiskVeryHighFrom,
 }
 
 /// <summary>Definição de um parâmetro: chave estável, unidade, faixa válida e valor padrão da spec.</summary>
@@ -30,6 +42,14 @@ public static class BusinessParameterCatalog
         {
             [BusinessParameter.MaintenanceUpcomingWindowDays] = new(
                 BusinessParameter.MaintenanceUpcomingWindowDays, "maintenance.upcoming-window-days", "dias", 1, 60, 7),
+            [BusinessParameter.PredictiveMinimumHistoryWeeks] = new(
+                BusinessParameter.PredictiveMinimumHistoryWeeks, "predictive.minimum-history-weeks", "semanas", 1, 52, 4),
+            [BusinessParameter.RiskModerateFrom] = new(
+                BusinessParameter.RiskModerateFrom, "predictive.risk-moderate-from", "pontos", 1, 98, 25),
+            [BusinessParameter.RiskHighFrom] = new(
+                BusinessParameter.RiskHighFrom, "predictive.risk-high-from", "pontos", 2, 99, 50),
+            [BusinessParameter.RiskVeryHighFrom] = new(
+                BusinessParameter.RiskVeryHighFrom, "predictive.risk-very-high-from", "pontos", 3, 100, 75),
         };
 
     public static IReadOnlyCollection<BusinessParameterDefinition> All => Definitions.Values.ToArray();

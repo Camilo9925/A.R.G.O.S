@@ -8,6 +8,7 @@ using Argos.Application.Inventory.Support;
 using Argos.Application.Inventory.Timeline;
 using Argos.Application.Inventory.Types;
 using Argos.Application.Operations;
+using Argos.Application.Predictive;
 using Argos.Application.Seeding.Operations;
 using Argos.Application.Telemetry;
 using Argos.Infrastructure.Persistence;
@@ -69,6 +70,10 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IAlertRepository, AlertRepository>();
         services.AddScoped<IOperationsQueries, OperationsQueries>();
         services.AddScoped<IOperationsSeedStore, OperationsSeedStore>();
+
+        // Cidade Preditiva (plan 17.10).
+        services.AddScoped<IOccurrenceQueries, OccurrenceQueries>();
+        services.AddScoped<IOccurrenceRepository, OccurrenceRepository>();
 
         services.AddSingleton<BusinessParameterCache>();
         services.AddScoped<IBusinessParameters, BusinessParameterStore>();

@@ -179,9 +179,32 @@ public sealed class InventorySeedingTests
         var created = await ParameterService().ProvisionAsync(
             new Dictionary<string, int> { ["maintenance.upcoming-window-days"] = 10 }, Ct);
 
-        Assert.Equal(["maintenance.upcoming-window-days"], created);
+        Assert.Equal(AllKeys, created);
         Assert.Equal(10, _inventory.Parameters[BusinessParameter.MaintenanceUpcomingWindowDays]);
         Assert.Equal(1, _inventory.UnitOfWork.SaveCalls);
+    }
+
+    private static readonly string[] AllKeys =
+    [
+        "maintenance.upcoming-window-days",
+        "predictive.minimum-history-weeks",
+        "predictive.risk-moderate-from",
+        "predictive.risk-high-from",
+        "predictive.risk-very-high-from",
+    ];
+
+    [Fact]
+    public async Task Parameters_Predictive_UseTheSpecDefaults_RN29_RN30_RN34()
+    {
+        await ParameterService().ProvisionAsync(null, Ct);
+
+        Assert.Equal(
+            [4, 25, 50, 75],
+            new[]
+            {
+                BusinessParameter.PredictiveMinimumHistoryWeeks, BusinessParameter.RiskModerateFrom,
+                BusinessParameter.RiskHighFrom, BusinessParameter.RiskVeryHighFrom,
+            }.Select(parameter => _inventory.Parameters[parameter]));
     }
 
     [Fact]
@@ -200,9 +223,9 @@ public sealed class InventorySeedingTests
         var created = await ParameterService().ProvisionAsync(
             new Dictionary<string, int> { ["maintenance.upcoming-window-days"] = 10 }, Ct);
 
-        Assert.Empty(created);
+        Assert.Equal(AllKeys.Skip(1), created);
         Assert.Equal(14, _inventory.Parameters[BusinessParameter.MaintenanceUpcomingWindowDays]);
-        Assert.Equal(0, _inventory.UnitOfWork.SaveCalls);
+        Assert.Equal(1, _inventory.UnitOfWork.SaveCalls);
     }
 
     [Theory]

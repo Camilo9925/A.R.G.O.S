@@ -4,6 +4,7 @@ using Argos.Application.Seeding;
 using Argos.Application.Operations;
 using Argos.Application.Seeding.Inventory;
 using Argos.Application.Seeding.Operations;
+using Argos.Application.Seeding.Predictive;
 using Argos.Infrastructure.DependencyInjection;
 using Argos.Infrastructure.Persistence;
 using Argos.Migrator.Configuration;
@@ -52,6 +53,9 @@ builder.Services.AddScoped<EquipmentAlertRaiser>();
 builder.Services.AddScoped<DutyRosterSeeder>();
 builder.Services.AddScoped<OperationsAlertSeeder>();
 
+// Fase 5 (plan 17.10): o histórico de ocorrências simuladas.
+builder.Services.AddScoped<OccurrenceHistorySeeder>();
+
 using var host = builder.Build();
 
 var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Argos.Migrator");
@@ -85,6 +89,10 @@ try
 
     // Escala de referência e alertas da Central (plan 16.9), depois do Inventário.
     await OperationsLoad.RunAsync(
+        host.Services, simulation, host.Services.GetRequiredService<TimeProvider>(), logger);
+
+    // Histórico de ocorrências simuladas da Cidade Preditiva (plan 17.10), depois das cargas da Fase 4.
+    await PredictiveLoad.RunAsync(
         host.Services, simulation, host.Services.GetRequiredService<TimeProvider>(), logger);
 
     // Os usuários de demonstração são reconciliados a cada execução, independentemente do seed (D-40).

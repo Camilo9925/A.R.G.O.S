@@ -127,7 +127,9 @@ public sealed class InventorySeedingTests(ApiFixture fixture) : IntegrationTestB
     {
         var created = await ProvisionAsync(new Dictionary<string, int> { [WindowKey] = 10 });
 
-        Assert.Equal([WindowKey], created);
+        Assert.Equal(
+            [WindowKey, "predictive.minimum-history-weeks", "predictive.risk-moderate-from", "predictive.risk-high-from", "predictive.risk-very-high-from"],
+            created);
         Assert.Equal(10m, await StoredWindowAsync());
     }
 

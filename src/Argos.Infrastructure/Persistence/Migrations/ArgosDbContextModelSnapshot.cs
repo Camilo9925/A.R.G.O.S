@@ -1499,6 +1499,77 @@ namespace Argos.Infrastructure.Persistence.Migrations
                     b.ToTable("alerts", (string)null);
                 });
 
+            modelBuilder.Entity("Argos.Domain.Operations.Occurrences.Occurrence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Author")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("author");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsSimulated")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_simulated");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("kind");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("latitude");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("longitude");
+
+                    b.Property<Guid>("NeighborhoodId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("neighborhood_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid?>("SourceResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_resource_id");
+
+                    b.Property<string>("SourceResourceKind")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("source_resource_kind");
+
+                    b.Property<string>("Street")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("street");
+
+                    b.HasKey("Id")
+                        .HasName("pk_occurrences");
+
+                    b.HasIndex("NeighborhoodId")
+                        .HasDatabaseName("ix_occurrences_neighborhood_id");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("ix_occurrences_occurred_at");
+
+                    b.ToTable("occurrences", (string)null);
+                });
+
             modelBuilder.Entity("Argos.Domain.Telemetry.ResourceLiveState", b =>
                 {
                     b.Property<string>("ResourceKind")
@@ -1809,6 +1880,16 @@ namespace Argos.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_agent_duty_shifts_agents_agent_id");
+                });
+
+            modelBuilder.Entity("Argos.Domain.Operations.Occurrences.Occurrence", b =>
+                {
+                    b.HasOne("Argos.Domain.Inventory.Geography.Neighborhood", null)
+                        .WithMany()
+                        .HasForeignKey("NeighborhoodId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_occurrences_neighborhoods_neighborhood_id");
                 });
 
             modelBuilder.Entity("Argos.Domain.Inventory.Agents.Agent", b =>

@@ -7,9 +7,11 @@ using Argos.Application.Inventory.Support;
 using Argos.Application.Inventory.Timeline;
 using Argos.Application.Inventory.Types;
 using Argos.Application.Operations;
+using Argos.Application.Predictive;
 using Argos.Application.Seeding;
 using Argos.Application.Seeding.Inventory;
 using Argos.Application.Seeding.Operations;
+using Argos.Application.Seeding.Predictive;
 using Argos.Application.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -56,6 +58,9 @@ public static class DependencyInjection
         services.AddScoped<OperationsSnapshotService>();
         services.AddScoped<OperationsDetailsService>();
 
+        // Fase 5 (plan 17.9): índice de risco e explicação, com as portas implementadas pela Infraestrutura.
+        services.AddScoped<RiskService>();
+
         // Carga inicial (plan 15.10, 15.11.4).
         services.AddScoped<BusinessParameterProvisioningService>();
         services.AddScoped<InventoryReferenceSeeder>();
@@ -64,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<InactivationSeeder>();
         services.AddScoped<DutyRosterSeeder>();
         services.AddScoped<OperationsAlertSeeder>();
+        services.AddScoped<OccurrenceHistorySeeder>();
 
         return services;
     }

@@ -2,7 +2,9 @@ using Argos.Application.Common;
 using Argos.Application.Common.Abstractions;
 using Argos.Application.Common.Exceptions;
 using Argos.Application.Inventory.Support;
+using Argos.Application.Operations;
 using Argos.Contracts.Inventory;
+using Argos.Contracts.Operations;
 using Argos.Domain.Inventory;
 using Argos.Domain.Inventory.Agents;
 using Argos.Domain.Inventory.Support;
@@ -14,6 +16,7 @@ namespace Argos.Application.Inventory.Agents;
 /// Cadastro, edição e inativação de agentes (US-06, US-09, RF-013, RF-014, RN-22, RN-25, RN-35; D-49, D-60, D-62;
 /// plan 15.2.9, 15.12). Os erros de campo saem todos de uma vez (D-46); a matrícula é única por órgão, inclusive entre
 /// inativos (US-06). Cada caso de uso grava com um único <c>SaveChanges</c>.
+/// <para>Depois de cada gravação, avisa a Central com <c>OperationsChanged</c> (D-80; plan 16.8).</para>
 /// </summary>
 public sealed class AgentService(
     IAgentRepository agents,
@@ -24,6 +27,7 @@ public sealed class AgentService(
     AgentQueryService agentQueries,
     IInventoryChangeLog changeLog,
     IUnitOfWork unitOfWork,
+    IRealtimeNotifier notifier,
     ICurrentActor actor,
     TimeProvider timeProvider)
 {
@@ -59,6 +63,8 @@ public sealed class AgentService(
 
         agents.Add(agent!);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        await notifier.PublishOperationsChangedAsync(
+            OperationsChangeKind.Registration, timeProvider.GetUtcNow(), cancellationToken);
 
         return await agentQueries.GetDetailsAsync(agent!.Id, cancellationToken);
     }
@@ -109,6 +115,8 @@ public sealed class AgentService(
                 timeProvider.GetUtcNow(),
                 actor.Name));
             await unitOfWork.SaveChangesAsync(cancellationToken);
+            await notifier.PublishOperationsChangedAsync(
+                OperationsChangeKind.Registration, timeProvider.GetUtcNow(), cancellationToken);
         }
 
         return await agentQueries.GetDetailsAsync(id, cancellationToken);
@@ -132,6 +140,8 @@ public sealed class AgentService(
 
         changeLog.Add(inactivation.Change);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        await notifier.PublishOperationsChangedAsync(
+            OperationsChangeKind.Registration, timeProvider.GetUtcNow(), cancellationToken);
     }
 
     /// <summary>Função pedida; sem ela, um valor fora do enum faz o Domínio apontar <c>role</c> junto com os demais campos (D-46).</summary>

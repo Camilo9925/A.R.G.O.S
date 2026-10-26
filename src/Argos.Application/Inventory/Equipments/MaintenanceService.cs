@@ -1,6 +1,8 @@
 using Argos.Application.Common;
 using Argos.Application.Common.Abstractions;
 using Argos.Application.Common.Exceptions;
+using Argos.Application.Operations;
+using Argos.Contracts.Operations;
 using Argos.Contracts.Inventory;
 using Argos.Domain.Common;
 using Argos.Domain.Inventory.Equipments;
@@ -13,14 +15,20 @@ namespace Argos.Application.Inventory.Equipments;
 /// Registro e conclusão de manutenções (US-05, RF-009, RN-07 a RN-11; plan 15.4). O "hoje" e a data da conclusão são os
 /// do fuso do município (D-54). A existência da manutenção (404) é conferida aqui, porque o agregado só carrega as
 /// abertas; o estado aberto (409) é conferido pelo Domínio.
+/// <para>
+/// <b>Alertas e avisos (plan 16.6, 16.8):</b> a conclusão sem sucesso que leva a Mau funcionamento (RN-11) abre ou atualiza o alerta na mesma unidade de trabalho
+/// (<see cref="EquipmentAlertRaiser"/>), e o aviso <c>OperationsChanged</c> sai depois do commit.
+/// </para>
 /// </summary>
 public sealed class MaintenanceService(
     IEquipmentRepository equipments,
     MunicipalCalendar calendar,
     EquipmentQueryService equipmentQueries,
     IUnitOfWork unitOfWork,
+    IRealtimeNotifier notifier,
     ICurrentActor actor,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    EquipmentAlertRaiser alertRaiser)
 {
     public async Task<MaintenanceData> RegisterAsync(
         Guid equipmentId, RegisterMaintenanceRequest request, CancellationToken cancellationToken = default)
@@ -30,8 +38,10 @@ public sealed class MaintenanceService(
         var equipment = await FindEquipmentAsync(equipmentId, cancellationToken);
         var (today, window) = await equipmentQueries.MaintenanceCalendarAsync(cancellationToken);
 
-        var maintenance = Register(equipment, request, today, timeProvider.GetUtcNow(), actor.Name);
+        var now = timeProvider.GetUtcNow();
+        var maintenance = Register(equipment, request, today, now, actor.Name);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        await notifier.PublishOperationsChangedAsync(OperationsChangeKind.Maintenance, now, cancellationToken);
 
         return EquipmentMapping.ToData(maintenance, today, window);
     }
@@ -68,15 +78,24 @@ public sealed class MaintenanceService(
         }
 
         var municipality = await calendar.GetMunicipalityAsync(cancellationToken);
+        var previous = equipment.Status;
+        var now = timeProvider.GetUtcNow();
         var completion = equipment.CompleteMaintenance(
             maintenanceId,
             EnumNames.Convert<DomainMaintenanceResult>(request.Result!.Value),
             request.CompletedAt!.Value,
             request.Notes,
             municipality.TimeZone,
-            timeProvider.GetUtcNow(),
+            now,
             actor.Name);
+
+        await alertRaiser.RaiseAsync(equipment, previous, now, actor.Name, cancellationToken);
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        await notifier.PublishOperationsChangedAsync(
+            equipment.Status != previous ? OperationsChangeKind.EquipmentStatus : OperationsChangeKind.Maintenance,
+            now,
+            cancellationToken);
 
         var (today, window) = await equipmentQueries.MaintenanceCalendarAsync(cancellationToken);
         return new MaintenanceCompletionData

@@ -5,6 +5,7 @@ using Argos.Application.Inventory.Geography;
 using Argos.Application.Inventory.Support;
 using Argos.Application.Inventory.Timeline;
 using Argos.Application.Inventory.Types;
+using Argos.Application.Operations;
 using Argos.Domain.Access;
 using Argos.Domain.Inventory.Geography;
 using Argos.Domain.Inventory.Support;
@@ -25,6 +26,7 @@ internal sealed class InventoryServices
     public InventoryServices()
     {
         Queries = new FakeInventoryQueries(Inventory);
+        Notifier = new FakeRealtimeNotifier(UnitOfWork);
 
         Municipality = InventoryTestData.NewMunicipality();
         Region = Region.Create("Centro");
@@ -45,6 +47,12 @@ internal sealed class InventoryServices
     public FakeInventoryQueries Queries { get; }
 
     public FakeTimelineQueries Timeline { get; } = new();
+
+    /// <summary>Avisos à Central publicados pelos serviços (D-80).</summary>
+    public FakeRealtimeNotifier Notifier { get; }
+
+    /// <summary>Alertas abertos pelos serviços do Inventário (plan 16.6).</summary>
+    public FakeAlertRepository Alerts { get; } = new();
 
     public FakeCurrentActor Actor { get; } = new("admin", UserRole.Administrator);
 
@@ -91,25 +99,29 @@ internal sealed class InventoryServices
 
     public EquipmentService EquipmentService() =>
         new(Inventory, Inventory, Inventory, Inventory, Locations(), Calendar(), ReferenceNames(), EquipmentQueryService(),
-            Inventory, UnitOfWork, Actor, Time);
+            Inventory, UnitOfWork, Notifier, Actor, Time, AlertRaiser());
 
     public EquipmentStatusService EquipmentStatusService() =>
-        new(Inventory, EquipmentQueryService(), UnitOfWork, Actor, Time);
+        new(Inventory, EquipmentQueryService(), UnitOfWork, Notifier, Actor, Time, AlertRaiser());
 
     public MaintenanceService MaintenanceService() =>
-        new(Inventory, Calendar(), EquipmentQueryService(), UnitOfWork, Actor, Time);
+        new(Inventory, Calendar(), EquipmentQueryService(), UnitOfWork, Notifier, Actor, Time, AlertRaiser());
+
+    public EquipmentAlertRaiser AlertRaiser() => new(Alerts);
 
     public EquipmentInactivationService EquipmentInactivationService() =>
-        new(Inventory, Inventory, Inventory, UnitOfWork, Actor, Time);
+        new(Inventory, Inventory, Inventory, UnitOfWork, Notifier, Actor, Time);
 
     public AgentQueryService AgentQueryService() => new(Queries, Calendar(), Inventory, Actor);
 
     public AgentService AgentService() =>
-        new(Inventory, Inventory, Inventory, Inventory, ReferenceNames(), AgentQueryService(), Inventory, UnitOfWork, Actor, Time);
+        new(Inventory, Inventory, Inventory, Inventory, ReferenceNames(), AgentQueryService(), Inventory, UnitOfWork, Notifier, Actor, Time);
 
-    public AgentStatusService AgentStatusService() => new(Inventory, AgentQueryService(), UnitOfWork, Actor, Time);
+    public AgentStatusService AgentStatusService() =>
+        new(Inventory, AgentQueryService(), UnitOfWork, Notifier, Actor, Time);
 
-    public AssignmentService AssignmentService() => new(Inventory, Inventory, Inventory, Inventory, UnitOfWork, Actor, Time);
+    public AssignmentService AssignmentService() =>
+        new(Inventory, Inventory, Inventory, Inventory, UnitOfWork, Notifier, Actor, Time);
 
     public TimelineService TimelineService() => new(Timeline, Queries, Queries);
 }

@@ -3,7 +3,9 @@ using Argos.Application.Common.Abstractions;
 using Argos.Application.Common.Exceptions;
 using Argos.Application.Inventory.Equipments;
 using Argos.Application.Inventory.Types;
+using Argos.Application.Operations;
 using Argos.Contracts.Inventory;
+using Argos.Contracts.Operations;
 using Argos.Domain.Inventory.Agents;
 using ContractEndReason = Argos.Contracts.Inventory.AssignmentEndReason;
 
@@ -13,6 +15,7 @@ namespace Argos.Application.Inventory.Agents;
 /// Vínculos entre agentes e equipamentos móveis (US-07, RF-016; D-62; plan 15.2.10, 15.12). As regras ficam na
 /// <see cref="AssignmentPolicy"/>; aqui se carregam o agente, o equipamento, o tipo e o vínculo aberto, e se grava
 /// tudo num único <c>SaveChanges</c>: na troca, o vínculo anterior encerrado e o novo entram na mesma gravação.
+/// <para>Depois de cada gravação, avisa a Central com <c>OperationsChanged</c> (D-80; plan 16.8).</para>
 /// </summary>
 public sealed class AssignmentService(
     IAgentRepository agents,
@@ -20,6 +23,7 @@ public sealed class AssignmentService(
     IEquipmentRepository equipments,
     IEquipmentTypeRepository types,
     IUnitOfWork unitOfWork,
+    IRealtimeNotifier notifier,
     ICurrentActor actor,
     TimeProvider timeProvider)
 {
@@ -52,6 +56,8 @@ public sealed class AssignmentService(
 
         assignments.Add(change.Started);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        await notifier.PublishOperationsChangedAsync(
+            OperationsChangeKind.Registration, timeProvider.GetUtcNow(), cancellationToken);
 
         return ToData(change.Started);
     }
@@ -71,6 +77,8 @@ public sealed class AssignmentService(
 
         assignment.End(timeProvider.GetUtcNow(), actor.Name);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        await notifier.PublishOperationsChangedAsync(
+            OperationsChangeKind.Registration, timeProvider.GetUtcNow(), cancellationToken);
 
         return ToData(assignment);
     }

@@ -1,7 +1,9 @@
 using Argos.Application.Common.Abstractions;
 using Argos.Application.Common.Exceptions;
 using Argos.Application.Inventory.Agents;
+using Argos.Application.Operations;
 using Argos.Contracts.Inventory;
+using Argos.Contracts.Operations;
 using Argos.Domain.Inventory.Agents;
 
 namespace Argos.Application.Inventory.Equipments;
@@ -15,12 +17,14 @@ namespace Argos.Application.Inventory.Equipments;
 /// Fica fora do <see cref="EquipmentService"/> porque depende da porta dos vínculos, implementada pela
 /// Infraestrutura da Fase 3: assim o cadastro e a edição continuam resolvíveis antes dela.
 /// </para>
+/// <para>Depois de cada gravação, avisa a Central com <c>OperationsChanged</c> (D-80; plan 16.8).</para>
 /// </summary>
 public sealed class EquipmentInactivationService(
     IEquipmentRepository equipments,
     IAgentAssignmentRepository assignments,
     IInventoryChangeLog changeLog,
     IUnitOfWork unitOfWork,
+    IRealtimeNotifier notifier,
     ICurrentActor actor,
     TimeProvider timeProvider)
 {
@@ -40,5 +44,7 @@ public sealed class EquipmentInactivationService(
 
         changeLog.Add(inactivation.Change);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        await notifier.PublishOperationsChangedAsync(
+            OperationsChangeKind.Registration, timeProvider.GetUtcNow(), cancellationToken);
     }
 }

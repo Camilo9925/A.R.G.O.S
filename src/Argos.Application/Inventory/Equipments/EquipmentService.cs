@@ -3,6 +3,8 @@ using Argos.Application.Common.Abstractions;
 using Argos.Application.Common.Exceptions;
 using Argos.Application.Inventory.Support;
 using Argos.Application.Inventory.Types;
+using Argos.Application.Operations;
+using Argos.Contracts.Operations;
 using Argos.Contracts.Inventory;
 using Argos.Domain.Inventory;
 using Argos.Domain.Inventory.Equipments;
@@ -17,6 +19,10 @@ namespace Argos.Application.Inventory.Equipments;
 /// campo saem todos de uma vez, com o caminho do contrato (D-46); a duplicidade de marca e número de série aponta o
 /// equipamento existente (RN-01), inclusive inativo. A inativação fica em <see cref="EquipmentInactivationService"/>,
 /// porque também encerra os vínculos de agentes (RN-35; D-62).
+/// <para>
+/// <b>Alertas e avisos (plan 16.6, 16.8):</b> o cadastro com a situação inicial Mau funcionamento (D-66) abre ou atualiza o alerta na mesma unidade de trabalho
+/// (<see cref="EquipmentAlertRaiser"/>), e o aviso <c>OperationsChanged</c> sai depois do commit.
+/// </para>
 /// </summary>
 public sealed class EquipmentService(
     IEquipmentRepository equipments,
@@ -29,8 +35,10 @@ public sealed class EquipmentService(
     EquipmentQueryService equipmentQueries,
     IInventoryChangeLog changeLog,
     IUnitOfWork unitOfWork,
+    IRealtimeNotifier notifier,
     ICurrentActor actor,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    EquipmentAlertRaiser alertRaiser)
 {
     /// <summary>Mensagem da RN-01, a mesma quando a duplicidade é pega pelo índice único do banco.</summary>
     public const string DuplicateBrandAndSerialMessage = "Já existe um equipamento com essa marca e esse número de série.";
@@ -102,7 +110,10 @@ public sealed class EquipmentService(
         }
 
         equipments.Add(equipment!);
+        await alertRaiser.RaiseAsync(equipment!, previousStatus: null, now, actor.Name, cancellationToken);
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        await notifier.PublishOperationsChangedAsync(OperationsChangeKind.Registration, now, cancellationToken);
 
         return await equipmentQueries.GetDetailsAsync(equipment!.Id, cancellationToken);
     }
@@ -151,13 +162,15 @@ public sealed class EquipmentService(
         if (changes!.Count > 0)
         {
             await EnsureUniqueBrandAndSerialAsync(equipment, cancellationToken);
+            var now = timeProvider.GetUtcNow();
             changeLog.Add(InventoryChange.Updated(
                 InventoryEntityType.Equipment,
                 id,
                 await referenceNames.ResolveAsync(changes, cancellationToken),
-                timeProvider.GetUtcNow(),
+                now,
                 actor.Name));
             await unitOfWork.SaveChangesAsync(cancellationToken);
+            await notifier.PublishOperationsChangedAsync(OperationsChangeKind.Registration, now, cancellationToken);
         }
 
         return await equipmentQueries.GetDetailsAsync(id, cancellationToken);

@@ -1,5 +1,4 @@
 using Argos.Application.Access;
-using Argos.Application.Diagnostics;
 using Argos.Application.Inventory;
 using Argos.Application.Inventory.Agents;
 using Argos.Application.Inventory.Equipments;
@@ -7,8 +6,11 @@ using Argos.Application.Inventory.Geography;
 using Argos.Application.Inventory.Support;
 using Argos.Application.Inventory.Timeline;
 using Argos.Application.Inventory.Types;
+using Argos.Application.Operations;
 using Argos.Application.Seeding;
 using Argos.Application.Seeding.Inventory;
+using Argos.Application.Seeding.Operations;
+using Argos.Application.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Argos.Application;
@@ -20,7 +22,6 @@ public static class DependencyInjection
     /// </summary>
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        services.AddScoped<TechnicalHeartbeatService>();
         services.AddScoped<LoginService>();
         services.AddScoped<DemoUserProvisioningService>();
 
@@ -47,12 +48,22 @@ public static class DependencyInjection
         services.AddScoped<AssignmentService>();
         services.AddScoped<TimelineService>();
 
+        // Fase 4 (plan 16.8): telemetria, alertas e Central, com as portas implementadas pela Infraestrutura (T113).
+        services.AddScoped<EquipmentAlertRaiser>();
+        services.AddScoped<TelemetryResourceService>();
+        services.AddScoped<TelemetryIngestionService>();
+        services.AddScoped<AlertService>();
+        services.AddScoped<OperationsSnapshotService>();
+        services.AddScoped<OperationsDetailsService>();
+
         // Carga inicial (plan 15.10, 15.11.4).
         services.AddScoped<BusinessParameterProvisioningService>();
         services.AddScoped<InventoryReferenceSeeder>();
         services.AddScoped<EquipmentCatalogSeeder>();
         services.AddScoped<AgentCatalogSeeder>();
         services.AddScoped<InactivationSeeder>();
+        services.AddScoped<DutyRosterSeeder>();
+        services.AddScoped<OperationsAlertSeeder>();
 
         return services;
     }

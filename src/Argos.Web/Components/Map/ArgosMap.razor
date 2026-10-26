@@ -9,27 +9,63 @@
 @code {
     private ElementReference _element;
     private LeafletMapInterop? _interop;
+    private DotNetObjectReference<ArgosMap>? _self;
     private bool _renderedDarkMode;
+    private IReadOnlyList<MapMarker>? _drawnMarkers;
 
     [CascadingParameter(Name = "IsDarkMode")]
     public bool IsDarkMode { get; set; } = true;
+
+    /// <summary>Marcadores a desenhar (Central). Uma lista nova substitui a anterior.</summary>
+    [Parameter]
+    public IReadOnlyList<MapMarker>? Markers { get; set; }
+
+    /// <summary>Chave do marcador clicado.</summary>
+    [Parameter]
+    public EventCallback<string> OnMarkerClick { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             _interop = new LeafletMapInterop(JSRuntime);
+            _self = DotNetObjectReference.Create(this);
             await _interop.CreateAsync(_element, Options.CenterLatitude, Options.CenterLongitude, Options.Zoom, IsDarkMode);
             _renderedDarkMode = IsDarkMode;
-            return;
         }
-
-        if (_interop is not null && _renderedDarkMode != IsDarkMode)
+        else if (_interop is not null && _renderedDarkMode != IsDarkMode)
         {
             await _interop.SetDarkModeAsync(IsDarkMode);
             _renderedDarkMode = IsDarkMode;
         }
+
+        if (_interop is not null && _self is not null && Markers is not null && !ReferenceEquals(Markers, _drawnMarkers))
+        {
+            _drawnMarkers = Markers;
+            await _interop.SetMarkersAsync(Markers, _self);
+        }
     }
+
+    /// <summary>Move marcadores já desenhados, sem recarregar a tela (tempo real; RF-028).</summary>
+    public async Task UpdatePositionsAsync(IReadOnlyList<MapPositionUpdate> updates)
+    {
+        if (_interop is not null)
+        {
+            await _interop.UpdatePositionsAsync(updates);
+        }
+    }
+
+    /// <summary>Centraliza e aproxima o mapa (RF-037); com a chave, abre o grupo que esconde o marcador.</summary>
+    public async Task FocusOnAsync(double latitude, double longitude, string? key = null, int zoom = 16)
+    {
+        if (_interop is not null)
+        {
+            await _interop.FocusOnAsync(latitude, longitude, zoom, key);
+        }
+    }
+
+    [JSInvokable]
+    public Task OnMarkerClicked(string key) => OnMarkerClick.InvokeAsync(key);
 
     public async ValueTask DisposeAsync()
     {
@@ -37,5 +73,7 @@
         {
             await _interop.DisposeAsync();
         }
+
+        _self?.Dispose();
     }
 }

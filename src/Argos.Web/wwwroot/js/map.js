@@ -195,6 +195,90 @@ export function setPickerPoint(id, latitude, longitude) {
   entry.map.panTo([latitude, longitude]);
 }
 
+// Camada de marcadores da Central (plan 16.12). O JS não decide nada: desenha a lista pronta que recebe, agrupa pelo
+// menor rank (a pior situação, RF-030) e devolve o clique ao .NET.
+function createCluster() {
+  return L.markerClusterGroup({
+    maxClusterRadius: 50,
+    showCoverageOnHover: false,
+    spiderfyOnMaxZoom: true,
+    iconCreateFunction: (cluster) => {
+      const children = cluster.getAllChildMarkers();
+      const worst = children.reduce((a, b) => (b.options.argos.rank < a.options.argos.rank ? b : a));
+      const { color, badgeHtml, statusLabel } = worst.options.argos;
+      const count = cluster.getChildCount();
+      const label = `${count} recursos agrupados. Pior situação: ${statusLabel}`;
+      return L.divIcon({
+        className: "argos-cluster",
+        html: `<span class="argos-cluster-box" style="--argos-marker-color:${color}" role="img" aria-label="${label}">` +
+          `<span class="argos-cluster-count">${count}</span><span class="argos-cluster-badge">${badgeHtml}</span></span>`,
+        iconSize: [46, 46],
+        iconAnchor: [23, 23],
+      });
+    },
+  });
+}
+
+// Substitui todos os marcadores pela lista recebida (retrato novo).
+export function setMarkers(id, markers, dotNetRef) {
+  const entry = maps.get(id);
+  if (!entry) {
+    return;
+  }
+
+  entry.dotNetRef = dotNetRef;
+  if (!entry.cluster) {
+    entry.cluster = createCluster();
+    entry.map.addLayer(entry.cluster);
+    entry.markers = new Map();
+  }
+
+  entry.cluster.clearLayers();
+  entry.markers.clear();
+  const layers = markers.map((item) => {
+    const marker = L.marker([item.latitude, item.longitude], {
+      icon: L.divIcon({ className: "argos-marker", html: item.html, iconSize: [36, 36], iconAnchor: [18, 18] }),
+      title: item.label,
+      alt: item.label,
+      keyboard: true,
+      riseOnHover: true,
+    });
+    marker.options.argos = { rank: item.rank, color: item.color, badgeHtml: item.badgeHtml, statusLabel: item.statusLabel };
+    marker.on("click", () => entry.dotNetRef?.invokeMethodAsync("OnMarkerClicked", item.key));
+    entry.markers.set(item.key, marker);
+    return marker;
+  });
+  entry.cluster.addLayers(layers);
+}
+
+// Move os marcadores conhecidos; ids ausentes (fora do filtro, por exemplo) são ignorados.
+export function updatePositions(id, updates) {
+  const entry = maps.get(id);
+  if (!entry?.markers) {
+    return;
+  }
+
+  for (const update of updates) {
+    entry.markers.get(update.key)?.setLatLng([update.latitude, update.longitude]);
+  }
+}
+
+// Centraliza e aproxima; com o marcador conhecido, abre o grupo que o esconde.
+export function focusOn(id, latitude, longitude, zoom, key) {
+  const entry = maps.get(id);
+  if (!entry) {
+    return;
+  }
+
+  const marker = key ? entry.markers?.get(key) : undefined;
+  if (marker && entry.cluster?.hasLayer(marker)) {
+    entry.cluster.zoomToShowLayer(marker, () => entry.map.panTo(marker.getLatLng()));
+    return;
+  }
+
+  entry.map.setView([latitude, longitude], Math.max(entry.map.getZoom(), zoom));
+}
+
 export function setDarkMode(id, isDarkMode) {
   const entry = maps.get(id);
   if (!entry || entry.isDarkMode === isDarkMode) {

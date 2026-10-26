@@ -39,6 +39,32 @@ public sealed class LeafletMapInterop(IJSRuntime jsRuntime) : IAsyncDisposable
         }
     }
 
+    /// <summary>Desenha a lista completa de marcadores da Central; o clique volta em <c>OnMarkerClicked(key)</c> (plan 16.12).</summary>
+    public async Task SetMarkersAsync<TReceiver>(IReadOnlyList<MapMarker> markers, DotNetObjectReference<TReceiver> receiver)
+        where TReceiver : class
+    {
+        if (_module is not null && _mapId is { } id)
+        {
+            await _module.InvokeVoidAsync("setMarkers", id, markers, receiver);
+        }
+    }
+
+    public async Task UpdatePositionsAsync(IReadOnlyList<MapPositionUpdate> updates)
+    {
+        if (_module is not null && _mapId is { } id && updates.Count > 0)
+        {
+            await _module.InvokeVoidAsync("updatePositions", id, updates);
+        }
+    }
+
+    public async Task FocusOnAsync(double latitude, double longitude, int zoom, string? key = null)
+    {
+        if (_module is not null && _mapId is { } id)
+        {
+            await _module.InvokeVoidAsync("focusOn", id, latitude, longitude, zoom, key);
+        }
+    }
+
     public async Task SetDarkModeAsync(bool isDarkMode)
     {
         if (_module is not null && _mapId is { } id)

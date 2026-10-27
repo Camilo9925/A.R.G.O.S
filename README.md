@@ -8,14 +8,6 @@ O ARGOS é uma plataforma de gestão de equipamentos e operações de segurança
 2. **Central de Operações:** o que está acontecendo agora?
 3. **Cidade Preditiva:** o que pode acontecer amanhã?
 
-> **Estado atual: entrega de 27/10/2026.** As três camadas funcionam sobre os dados simulados de Prometeia, com login e três perfis (Administrador, Operador e Gestor):
->
-> - **Inventário:** 300 equipamentos e 80 agentes, com pesquisa, filtros, cadastro, situação, manutenções, vínculos entre agentes e viaturas, linha do tempo e inativação (nada é excluído).
-> - **Central de Operações:** o mapa ao vivo, com equipamentos e agentes em movimento, indicadores, filtros, alertas e detalhes, destaque de manutenção e situação por região, alimentada pela telemetria simulada do PROMETHEUS.
-> - **Cidade Preditiva:** o índice de risco de ocorrências por região, com a grade por dia e faixa horária, o mapa de risco e a explicação de cada previsão.
->
-> O que ficou **fora da entrega** está em [O que não faz parte desta entrega](#o-que-não-faz-parte-desta-entrega). Para percorrer tudo, siga o [Roteiro de demonstração](#roteiro-de-demonstração).
-
 > **Dados simulados e fictícios.** Na ausência de dispositivos reais, o ARGOS opera com dados **simulados**, e a Web mostra no cabeçalho, o tempo todo, o selo **"Dados simulados"**. Prometeia/SP e todos os nomes, ruas, bairros, CEPs, marcas, números de série, pessoas, matrículas e placas são **fictícios**. A geometria das ruas vem da malha viária de uma cidade real do interior paulista (OpenStreetMap), exibida sem nenhum nome real.
 
 ## Pré-requisitos
@@ -53,24 +45,6 @@ O ambiente do Compose é o **ambiente de demonstração**: a tela de login mostr
 As senhas são as do seu `.env` (`DEMO_*_PASSWORD`); com o `.env.example` sem alteração, são `troque-senha-admin`, `troque-senha-operador` e `troque-senha-gestor`. O cabeçalho mostra o nome e o perfil de quem entrou, e **Sair** volta à tela de login. Uma página fora do perfil (por exemplo, o Operador em `/inventory/equipment` ou em `/predictive`) mostra "Acesso negado". A sessão dura 8 horas e termina ao fechar a aba do navegador; ao vencer, o ARGOS volta ao login com "Sua sessão expirou.".
 
 O preenchimento rápido existe **só no ambiente de demonstração**: fora dele (imagem da Web sem `ARGOS_ENVIRONMENT=Demo`, ou `dotnet run`), a tela mostra só o formulário, e nenhuma credencial é exibida.
-
-## O que não faz parte desta entrega
-
-Por causa do prazo de 27/10/2026, estas partes continuam especificadas (em `specs/`), mas **não foram implementadas**:
-
-| O quê | Observação |
-|---|---|
-| **US-10**, tipos personalizados de equipamento | Só existem os 10 tipos da carga; não há tela para criar outros. |
-| **US-16 e US-17**, só em parte | Entram o destaque de manutenção no mapa, o contador **Manutenções**, o quadro **Situação por região** e as regiões pintadas no mapa, calculados na própria Web sobre o recorte filtrado. Ficam fora o alerta de manutenção vencida ou próxima, o alerta da classificação da região e o cálculo pela API (exceção temporária registrada no `plan.md`, D-102). |
-| **US-18 e US-19**, na Central: equipamentos e agentes sem comunicação e mapa de calor | A Central mostra a última comunicação só nos detalhes. |
-| **US-21**, recomendação de reforço de equipes | A Preditiva não traz recomendações para aceitar ou descartar; cada previsão só traz a sugestão de uma frase. |
-| **US-22 a US-24**, anomalias, risco de falha, tendências e alertas preventivos | |
-| **Taxa de acerto** da previsão (RN-32, CS-09) | Corte de contingência (b), adiantado: não há backtest nem taxa de acerto. |
-| **Roteiro automático de demonstração** (RF-052) | A reação da Central é demonstrada pela própria interface: o Operador marca uma câmera como Furtado, e o alerta aparece. |
-| **CS-07**, teste de capacidade | Não foi medida; a massa padrão é de cerca de 300 equipamentos e 80 agentes. |
-| **Exceção temporária ao Art. VII.4** (ausência de sinal) | O ARGOS não verifica nem sinaliza equipamento ou agente sem comunicação. Fica como primeiro item da próxima rodada de planejamento. |
-
-Também ficam para depois: a tela de edição dos parâmetros de negócio, os alertas de manutenção e de região, os alertas na linha do tempo, as ocorrências ao vivo pela telemetria (o histórico de ocorrências é simulado e fixo) e a consolidação da telemetria bruta.
 
 ## Inventário
 
@@ -141,8 +115,6 @@ Um agente pode ser vinculado a uma **moto de agente de trânsito** ou a uma **vi
 - do **equipamento**: cadastro, mudanças de situação, manutenções e alterações de cadastro;
 - do **agente**: cadastro, mudanças de situação, alterações e vínculos.
 
-Os alertas da Central não entram na linha do tempo nesta entrega.
-
 ### Inativação
 
 **Inativar**, nos detalhes do equipamento ou do agente, tira o cadastro de uso sem apagar nada:
@@ -175,14 +147,14 @@ A **Central** (menu **Central**, a página inicial) mostra o que está acontecen
 - **Mapa** de Prometeia com o ícone do tipo (ou da função do agente) em cada marcador e a situação em **cor e ícone** (Ainda não instalado aparece vazado e tracejado). Equipamentos móveis e agentes **andam** pelas ruas sem recarregar. Com o mapa afastado, os marcadores se agrupam e mostram a quantidade e a pior situação do grupo. **Legenda do mapa** fica sempre à mão.
 - **Indicadores:** Total de equipamentos, Operacionais, Indisponíveis, Disponibilidade (operacionais ÷ (total − ainda não instalados − desativados), sem contar os inativos), Agentes em atividade e Alertas abertos por gravidade. Sem filtros, na carga: **297** equipamentos (198 fixos e 99 móveis, os 3 inativados ficam de fora), **252** operacionais, **27** indisponíveis e **90,3%** de disponibilidade. O cartão **Manutenções** conta os equipamentos com manutenção **Imediata**, **Vencida** e **Próxima** (do recorte filtrado); cada contagem é um botão que aplica o filtro de necessidade de manutenção.
 - **Destaque de manutenção:** o equipamento com manutenção Imediata, Vencida ou Próxima ganha um **selo quadrado** no canto superior esquerdo do marcador, com a cor, o ícone e o texto da necessidade (no rótulo do marcador e na legenda). É diferente do contorno redondo, que é de alerta aberto. Ainda **não há alerta** de manutenção.
-- **Situação por região:** abaixo do mapa, o quadro classifica cada região em **Normal**, **Atenção** ou **Crítica** (cor, ícone e texto), com disponibilidade, indisponíveis, alertas abertos (os críticos em destaque) e agentes em atividade, da mais grave para a menos grave. A regra é a RN-24: **Crítica** com disponibilidade abaixo de 75% ou algum alerta crítico aberto na região (mesmo já reconhecido); **Atenção** de 75% a 89,9%; **Normal** a partir de 90% e sem alerta crítico; **Sem dados no recorte** quando nenhum equipamento da região passa pelos filtros. Na carga, **Centro**, **Zona Sul** e **Zona Oeste** estão Críticas pelo alerta crítico aberto, **Zona Leste** está em Atenção (76,2%) e **Zona Norte**, Normal (96,6%). As regiões também aparecem **pintadas no mapa** pela classificação, e clicar numa região **no quadro** filtra a Central por ela (no mapa, as regiões só são pintadas: um clique no fundo do mapa não filtra nada). **A conta é feita na Web, sobre o que os filtros deixam passar:** com filtros ativos, o quadro mostra o recorte, e não a cidade inteira; por isso, com um filtro de equipamento (tipo, situação, manutenção, órgão ou bairro), o mapa deixa de pintar as regiões, e o quadro avisa o motivo.
+- **Situação por região:** abaixo do mapa, o quadro classifica cada região em **Normal**, **Atenção** ou **Crítica** (cor, ícone e texto), com disponibilidade, indisponíveis, alertas abertos (os críticos em destaque) e agentes em atividade, da mais grave para a menos grave. A regra: **Crítica** com disponibilidade abaixo de 75% ou algum alerta crítico aberto na região (mesmo já reconhecido); **Atenção** de 75% a 89,9%; **Normal** a partir de 90% e sem alerta crítico; **Sem dados no recorte** quando nenhum equipamento da região passa pelos filtros. Na carga, **Centro**, **Zona Sul** e **Zona Oeste** estão Críticas pelo alerta crítico aberto, **Zona Leste** está em Atenção (76,2%) e **Zona Norte**, Normal (96,6%). As regiões também aparecem **pintadas no mapa** pela classificação, e clicar numa região **no quadro** filtra a Central por ela (no mapa, as regiões só são pintadas: um clique no fundo do mapa não filtra nada). **A conta é feita na Web, sobre o que os filtros deixam passar:** com filtros ativos, o quadro mostra o recorte, e não a cidade inteira; por isso, com um filtro de equipamento (tipo, situação, manutenção, órgão ou bairro), o mapa deixa de pintar as regiões, e o quadro avisa o motivo.
 - **Filtros** por Tipo, Situação, Necessidade de manutenção, Função do agente (só quem vê agentes), Órgão, Região e Bairro; vários valores no mesmo filtro somam, e filtros diferentes se combinam. Os filtros ativos aparecem como chips, com **Limpar filtros**, e ficam no endereço do navegador. Os indicadores e o mapa acompanham os filtros. Sem recurso, a tela diz "Nenhum recurso com esses filtros.".
 - **Alertas abertos:** na carga, **18**, sendo **15 Altos** (equipamentos em mau funcionamento) e **3 Críticos** (as câmeras furtadas no Centro, na Zona Sul e na Zona Oeste). Os alertas seguem **ordenados por gravidade e horário**, e clicar num alerta centraliza o mapa no recurso e abre os detalhes. Os alertas que ficam fora dos filtros aparecem marcados com **Fora do filtro**.
 - **Faixa de críticos**, fixa no topo e sempre visível, sem precisar de rolagem nem de clique: "N alertas críticos abertos", com o mais recente, **piscando enquanto houver crítico por reconhecer**. Ela continua à vista (sem piscar) até todos os críticos serem resolvidos, mesmo com filtros ativos.
 - **Detalhes:** clicar num marcador abre o painel com tipo, identificação, situação, localização, órgão, características, manutenção, **Última comunicação** e alertas abertos (para o agente: nome, função, órgão, situação, equipamento vinculado e horário da última posição). **Ver histórico** leva à linha do tempo; **Alterar situação** abre o mesmo diálogo do Inventário.
 - **Tempo real:** o cabeçalho mostra **Conectado** e **"Última telemetria: HH:mm:ss"**, que avança a cada poucos segundos. Com a API parada, a Central avisa "Tempo real interrompido" e, na volta, reconecta e busca um retrato novo.
 
-**Alertas** (um por equipamento e causa): um equipamento **furtado** gera um alerta **Crítico**, e um em **mau funcionamento**, um **Alto**; as demais causas não fazem parte desta entrega. **Reconhecer** registra quem e quando e faz o alerta parar de piscar, sem tirá-lo da lista. **Resolver** pede uma **observação** (obrigatória) e tira o alerta da lista; um crítico só pode ser resolvido **depois** de reconhecido, e por isso o botão só aparece então. Se o equipamento voltar a falhar enquanto o alerta está aberto, o alerta conta mais uma ocorrência ("2 ocorrências"), em vez de abrir outro.
+**Alertas** (um por equipamento e causa): um equipamento **furtado** gera um alerta **Crítico**, e um em **mau funcionamento**, um **Alto**. **Reconhecer** registra quem e quando e faz o alerta parar de piscar, sem tirá-lo da lista. **Resolver** pede uma **observação** (obrigatória) e tira o alerta da lista; um crítico só pode ser resolvido **depois** de reconhecido, e por isso o botão só aparece então. Se o equipamento voltar a falhar enquanto o alerta está aberto, o alerta conta mais uma ocorrência ("2 ocorrências"), em vez de abrir outro.
 
 ### Telemetria simulada
 
@@ -193,7 +165,7 @@ O **simulador** (`simulator`) faz o papel do PROMETHEUS: a cada ciclo, envia à 
 | `TELEMETRY_POSITION_INTERVAL_SECONDS` | `5` | Lotes de posições e trocas de turno |
 | `TELEMETRY_HEARTBEAT_INTERVAL_SECONDS` | `60` | Sinal de vida dos equipamentos fixos |
 
-Nesta entrega o sinal de vida é parte da telemetria; o antigo endpoint técnico `POST /api/diagnostics/heartbeats` **não existe mais** (a API responde `404`).
+O sinal de vida dos equipamentos fixos faz parte da telemetria.
 
 **Escala de referência:** cerca de 300 equipamentos e 80 agentes. Os agentes seguem uma **escala de três turnos**, no fuso de Prometeia: manhã (6h às 14h), tarde (14h às 22h) e noite (22h às 6h). **Agentes em atividade** muda com o turno: **27** de manhã, **26** à tarde e **25** à noite (com 12, 4, 4, 4 e 2 por região à tarde: Centro, Zona Leste, Zona Norte, Zona Oeste e Zona Sul). Ao entrar em serviço, o agente aparece na linha do tempo como "Fora de serviço → Em serviço", com autor `PROMETHEUS`.
 
@@ -288,7 +260,7 @@ Para ver o log: `docker compose logs migrator`.
 
 ### Parâmetros de negócio (`BusinessParameters`)
 
-Os parâmetros de negócio ajustáveis pelo Administrador ficam no banco. Nesta entrega existe um: `maintenance.upcoming-window-days`, quantos dias antes da data prevista uma manutenção passa a ser **Próxima** (padrão 7, de 1 a 60). O valor inicial vem da seção `BusinessParameters` de `src/Argos.Migrator/appsettings.json`:
+Os parâmetros de negócio ajustáveis pelo Administrador ficam no banco. Há um: `maintenance.upcoming-window-days`, quantos dias antes da data prevista uma manutenção passa a ser **Próxima** (padrão 7, de 1 a 60). O valor inicial vem da seção `BusinessParameters` de `src/Argos.Migrator/appsettings.json`:
 
 ```json
 "BusinessParameters": {
@@ -296,7 +268,7 @@ Os parâmetros de negócio ajustáveis pelo Administrador ficam no banco. Nesta 
 }
 ```
 
-O `migrator` só cria os parâmetros que ainda não existem no banco e **nunca sobrescreve um valor já gravado**. Assim, mudar o arquivo vale para um banco novo: altere o valor e rode `docker compose down -v` e `docker compose up --build` (o `--build` leva o arquivo novo para a imagem do `migrator`). Uma chave desconhecida ou um valor fora da faixa faz o `migrator` terminar com código 1 e a mensagem da chave no log, sem subir a API. A tela para o Administrador editar os parâmetros chega numa fase seguinte.
+O `migrator` só cria os parâmetros que ainda não existem no banco e **nunca sobrescreve um valor já gravado**. Assim, mudar o arquivo vale para um banco novo: altere o valor e rode `docker compose down -v` e `docker compose up --build` (o `--build` leva o arquivo novo para a imagem do `migrator`). Uma chave desconhecida ou um valor fora da faixa faz o `migrator` terminar com código 1 e a mensagem da chave no log, sem subir a API.
 
 ## Variáveis do `.env`
 

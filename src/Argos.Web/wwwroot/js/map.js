@@ -270,7 +270,8 @@ export function setRegions(id, regions, dotNetRef) {
       weight: region.isSelected ? 5 : 2,
       dashArray: region.isDashed ? "8 6" : null,
       fillColor: region.color,
-      fillOpacity: region.isDashed ? 0.12 : 0.38,
+      fillOpacity: region.isDashed ? 0.12 : (region.fillOpacity ?? 0.38),
+      interactive: region.isInteractive ?? true,
       bubblingMouseEvents: false,
     }).addTo(entry.regionLayer);
 
@@ -279,6 +280,12 @@ export function setRegions(id, regions, dotNetRef) {
       direction: "center",
       className: "argos-region-label",
     });
+
+    // Região só pintada (a Central): sem clique e fora da ordem de Tab.
+    if (region.isInteractive === false) {
+      continue;
+    }
+
     polygon.on("click", () => entry.dotNetRef?.invokeMethodAsync("OnRegionClicked", region.key));
 
     const element = polygon.getElement();

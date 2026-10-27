@@ -1,4 +1,4 @@
-@* Legenda do mapa (RF-029): situações, funções, tipos e gravidades, sempre ao alcance, com texto e ícone além da cor (Art. X.2, XI.2). *@
+@* Legenda do mapa (RF-029): situações, necessidades de manutenção (US-16), regiões (US-17), funções, tipos e gravidades, sempre ao alcance, com texto e ícone além da cor (Art. X.2, XI.2). *@
 <MudExpansionPanels Elevation="0" Outlined="true" Class="argos-map-legend">
     <MudExpansionPanel Text="Legenda do mapa">
         <MudStack Spacing="2">
@@ -12,6 +12,35 @@
                 </div>
                 <MudText Typo="Typo.caption">
                     Ainda não instalado aparece vazado e tracejado. O contorno colorido em volta do marcador indica alerta aberto.
+                </MudText>
+            </div>
+            <div>
+                <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mb-1">Necessidade de manutenção</MudText>
+                <div class="argos-legend">
+                    @foreach (var (need, token) in MaintenanceNeedTokens.All)
+                    {
+                        @if (OperationsMarkers.HighlightedNeed(need) is not null)
+                        {
+                            <TokenBadge Token="token" />
+                        }
+                    }
+                </div>
+                <MudText Typo="Typo.caption">
+                    O selo quadrado no canto superior esquerdo do marcador indica manutenção imediata, vencida ou próxima.
+                    Ele é diferente do contorno redondo, que é de alerta, e do selo redondo, que é da situação.
+                </MudText>
+            </div>
+            <div>
+                <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mb-1">Situação da região (RN-24)</MudText>
+                <div class="argos-legend">
+                    @foreach (var (_, token) in RegionClassificationTokens.All)
+                    {
+                        <TokenBadge Token="token" />
+                    }
+                </div>
+                <MudText Typo="Typo.caption">
+                    As regiões pintadas no mapa seguem a classificação do quadro "Situação por região". O mapa só as pinta sem
+                    filtros de equipamento (o de região pode estar ativo); para filtrar por uma região, use o quadro.
                 </MudText>
             </div>
             @if (AgentsVisible)

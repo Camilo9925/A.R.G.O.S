@@ -3,7 +3,7 @@
 
 @*
     Indicadores (US-12, RF-032): tudo vem calculado pela API sobre as mesmas linhas filtradas do mapa (D-59); aqui só
-    se mostra.
+    se mostra. A exceção é o contador de manutenções (US-16, parcial), contado dos marcadores do mesmo retrato.
 *@
 <MudStack Spacing="1" Class="mb-3">
     <div class="argos-indicators" role="group" aria-label="Indicadores">
@@ -39,6 +39,23 @@
                 }
             </div>
         </MudPaper>
+        @* US-16 (parcial): contadas no cliente a partir dos marcadores do retrato; clicar aplica o filtro de necessidade de manutenção. *@
+        <MudPaper Outlined="true" Class="pa-2" data-testid="indicator-maintenance">
+            <MudText Typo="Typo.caption">Manutenções · conforme os filtros</MudText>
+            <div class="argos-legend mt-1" role="group" aria-label="Filtrar por necessidade de manutenção">
+                @foreach (var (need, token) in HighlightedNeeds)
+                {
+                    var selected = ActiveNeeds.Contains(need);
+                    <button type="button" class="@($"argos-badge argos-badge--button{(selected ? " argos-badge--selected" : string.Empty)}")"
+                            style="@($"--argos-badge-color: {token.Color}")" aria-pressed="@(selected ? "true" : "false")"
+                            title="@NeedTitle(token, selected)"
+                            @onclick="() => OnNeedSelected.InvokeAsync(need)">
+                        <MudIcon Icon="@token.Icon" Size="Size.Small" aria-hidden="true" Class="argos-badge-icon" />
+                        <span>@token.Label: @CountOf(need)</span>
+                    </button>
+                }
+            </div>
+        </MudPaper>
     </div>
     <MudText Typo="Typo.caption" role="status">Atualizado às @DisplayTime.FormatTime(GeneratedAt)</MudText>
 </MudStack>
@@ -49,6 +66,26 @@
 
     [Parameter, EditorRequired]
     public DateTimeOffset GeneratedAt { get; set; }
+
+    /// <summary>Equipamentos do retrato, de onde saem as contagens de manutenção (US-16).</summary>
+    [Parameter]
+    public IReadOnlyList<EquipmentMarker> Equipment { get; set; } = [];
+
+    /// <summary>Necessidades já aplicadas no filtro, para marcar o botão pressionado.</summary>
+    [Parameter]
+    public IReadOnlyCollection<MaintenanceNeed> ActiveNeeds { get; set; } = [];
+
+    /// <summary>Clicou numa necessidade: a página aplica ou remove o filtro.</summary>
+    [Parameter]
+    public EventCallback<MaintenanceNeed> OnNeedSelected { get; set; }
+
+    private static IEnumerable<(MaintenanceNeed Need, StatusToken Token)> HighlightedNeeds =>
+        MaintenanceNeedTokens.All.Where(item => OperationsMarkers.HighlightedNeed(item.Need) is not null);
+
+    private static string NeedTitle(StatusToken token, bool selected) =>
+        (selected ? "Remover o filtro de manutenção " : "Filtrar por manutenção ") + token.Label.ToLowerInvariant();
+
+    private int CountOf(MaintenanceNeed need) => Equipment.Count(item => item.MaintenanceNeed == need);
 
     private int CountOf(AlertSeverity severity) =>
         Indicators.OpenAlertsBySeverity.FirstOrDefault(count => count.Severity == severity)?.Count ?? 0;

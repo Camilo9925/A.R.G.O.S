@@ -212,6 +212,49 @@ h1:focus {
   color: var(--argos-badge-color);
 }
 
+/* Selo clicável (contadores de manutenção e região do quadro): mesmo desenho do selo, com foco visível e estado pressionado. */
+button.argos-badge--button {
+  font-family: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+button.argos-badge--button:hover {
+  background: var(--mud-palette-action-default-hover);
+}
+
+button.argos-badge--button:focus-visible {
+  outline: 2px solid #00C2FF;
+  outline-offset: 2px;
+}
+
+.argos-badge--selected {
+  background: var(--mud-palette-action-default-hover);
+  font-weight: 600;
+}
+
+/* Nome da região no quadro "Situação por região" (US-17): botão com cara de link, para filtrar a Central. */
+.argos-region-button {
+  padding: 0.1rem 0.25rem;
+  border: none;
+  background: transparent;
+  color: var(--mud-palette-primary);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.argos-region-button:focus-visible {
+  outline: 2px solid #00C2FF;
+  outline-offset: 2px;
+}
+
+.argos-region-button--selected {
+  color: var(--mud-palette-text-primary);
+  text-decoration-thickness: 3px;
+}
+
 .argos-legend {
   display: flex;
   flex-wrap: wrap;
@@ -413,6 +456,25 @@ h1:focus {
   border-radius: 50%;
   background: #0B1E3F;
   color: var(--argos-marker-color);
+  box-shadow: 0 0 0 1px #E8EEF5;
+}
+
+/* Necessidade de manutenção (US-16): selo quadrado no canto superior esquerdo, com a cor e o ícone da necessidade; o
+   contorno redondo continua sendo só do alerta e o selo redondo do canto inferior direito, só da situação. */
+.argos-poi-need {
+  position: absolute;
+  left: -8px;
+  top: -8px;
+  width: 17px;
+  height: 17px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  border: 2px solid var(--argos-need-color);
+  background: #0B1E3F;
+  color: var(--argos-need-color);
   box-shadow: 0 0 0 1px #E8EEF5;
 }
 

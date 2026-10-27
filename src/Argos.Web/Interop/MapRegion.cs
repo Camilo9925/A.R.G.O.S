@@ -10,10 +10,14 @@ namespace Argos.Web.Interop;
 /// <param name="Label">Rótulo fixo, como "Zona Leste · Alto (68)".</param>
 /// <param name="IsDashed">Contorno tracejado: dados insuficientes (RN-29).</param>
 /// <param name="IsSelected">Região escolhida na grade: contorno mais grosso.</param>
+/// <param name="FillOpacity">Opacidade do preenchimento; a Central usa menos, para os marcadores continuarem legíveis (US-17).</param>
+/// <param name="IsInteractive">Responde ao clique e ao teclado; a Central desliga, porque as regiões cobrem a cidade inteira (US-17).</param>
 public sealed record MapRegion(
     string Key,
     double[][][] Rings,
     string Color,
     string Label,
     bool IsDashed,
-    bool IsSelected);
+    bool IsSelected,
+    double FillOpacity = 0.38,
+    bool IsInteractive = true);

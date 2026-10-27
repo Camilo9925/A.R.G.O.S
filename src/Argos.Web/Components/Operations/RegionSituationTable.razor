@@ -1,0 +1,96 @@
+@using System.Globalization
+
+@*
+    "Situação por região" (US-17, RF-039, RN-24; plan 16.12). Substitui a tabela de agentes por região (RF-032, que continua
+    na última coluna e vale para todos os perfis, inclusive o Gestor; D-10, RN-27). A classificação é calculada na Web a
+    partir do retrato (ver RegionSituations); com filtros ativos o quadro reflete só o recorte filtrado. Clicar na região
+    aplica o filtro de região da Central; clicar de novo na região única filtrada remove o filtro. O mapa só pinta as
+    regiões sem recorte de equipamentos (OperationsCenter.PaintsRegions), e o quadro avisa quando não pinta.
+*@
+<MudPaper Outlined="true" Class="pa-2" data-testid="region-situation">
+    <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mb-1">Situação por região</MudText>
+    <MudText Typo="Typo.caption" Class="d-block mb-1">
+        Conforme os filtros ativos. Crítica: disponibilidade abaixo de 75% ou algum alerta crítico aberto; Atenção: de 75% a 89,9%;
+        Normal: a partir de 90% e sem alerta crítico; Sem dados no recorte: nenhum equipamento da região passa pelos filtros.
+        Clique numa região para filtrar a Central por ela.
+    </MudText>
+    @if (!MapPainted)
+    {
+        <MudText Typo="Typo.caption" Class="d-block mb-1" role="status">
+            Com filtros de equipamento, o mapa não pinta as regiões: a cor mostraria só o recorte, e não a região inteira.
+        </MudText>
+    }
+    @if (Regions.Count == 0)
+    {
+        <MudText Typo="Typo.body2" role="status">Nenhuma região com equipamentos, alertas ou agentes nesse recorte.</MudText>
+    }
+    else
+    {
+        <MudSimpleTable Dense="true" Hover="true" Style="overflow-x: auto" aria-label="Situação por região">
+            <thead>
+                <tr>
+                    <th>Região</th>
+                    <th>Situação</th>
+                    <th>Disponibilidade</th>
+                    <th>Indisponíveis</th>
+                    <th>Alertas abertos</th>
+                    <th>Agentes em atividade</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var region in Regions)
+                {
+                    var selected = SelectedRegionIds.Contains(region.RegionId);
+                    <tr>
+                        <td>
+                            <button type="button" class="@($"argos-region-button{(selected ? " argos-region-button--selected" : string.Empty)}")"
+                                    aria-pressed="@(selected ? "true" : "false")"
+                                    title="@ButtonTitle(region, selected)"
+                                    @onclick="() => OnSelect.InvokeAsync(region.RegionId)">
+                                @region.RegionName
+                            </button>
+                        </td>
+                        <td><TokenBadge Token="RegionClassificationTokens.For(region.Classification)" /></td>
+                        <td>@FormatAvailability(region)</td>
+                        <td>@region.Unavailable</td>
+                        <td>
+                            @region.OpenAlerts
+                            @if (region.CriticalAlerts > 0)
+                            {
+                                <span class="argos-badge ml-1" style="@($"--argos-badge-color: {Critical.Color}")">
+                                    <MudIcon Icon="@Critical.Icon" Size="Size.Small" aria-hidden="true" Class="argos-badge-icon" />
+                                    <span>@region.CriticalAlerts @(region.CriticalAlerts == 1 ? "crítico" : "críticos")</span>
+                                </span>
+                            }
+                        </td>
+                        <td>@region.AgentsInActivity</td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    }
+</MudPaper>
+
+@code {
+    private static readonly StatusToken Critical = AlertSeverityTokens.Critical;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<RegionSituation> Regions { get; set; } = [];
+
+    /// <summary>Regiões já escolhidas no filtro, para marcar a linha.</summary>
+    [Parameter]
+    public IReadOnlyCollection<Guid> SelectedRegionIds { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<Guid> OnSelect { get; set; }
+
+    /// <summary>O mapa está pintando as regiões; com recorte de equipamentos, não pinta, e o quadro diz por quê.</summary>
+    [Parameter]
+    public bool MapPainted { get; set; } = true;
+
+    private static string ButtonTitle(RegionSituation region, bool selected) =>
+        (selected ? "Remover o filtro da região " : "Filtrar a Central pela região ") + region.RegionName;
+
+    private static string FormatAvailability(RegionSituation region) =>
+        region.AvailabilityPercent is { } percent ? $"{percent.ToString("0.0", CultureInfo.CurrentCulture)}%" : "—";
+}

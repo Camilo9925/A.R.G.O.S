@@ -122,7 +122,9 @@
                 <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-hidden="true" Class="mb-2" />
             }
 
-            <IndicatorCards Indicators="_snapshot.Indicators" GeneratedAt="_snapshot.GeneratedAt" />
+            <IndicatorCards Indicators="_snapshot.Indicators" GeneratedAt="_snapshot.GeneratedAt"
+                            Equipment="_snapshot.Equipment" ActiveNeeds="Parsed<MaintenanceNeed>(MaintenanceNeed)"
+                            OnNeedSelected="SelectNeedAsync" />
 
             @if (_snapshot.Equipment.Count == 0 && _snapshot.Agents.Count == 0)
             {
@@ -143,11 +145,12 @@
         <div class="argos-operations-grid">
             <div class="argos-operations-map">
                 <OperationsLegend Types="_types" AgentsVisible="_snapshot?.AgentPositionsVisible ?? false" />
-                <ArgosMap @ref="_map" Markers="_markers" OnMarkerClick="OnMarkerClickedAsync" />
+                <ArgosMap @ref="_map" Markers="_markers" OnMarkerClick="OnMarkerClickedAsync" Regions="_mapRegions" />
                 @if (_snapshot is not null)
                 {
                     <div class="mt-3">
-                        <RegionAgentsTable Regions="_snapshot.Indicators.AgentsInActivityByRegion" />
+                        <RegionSituationTable Regions="_situations" SelectedRegionIds="Selected(RegionId)" OnSelect="SelectRegionAsync"
+                                              MapPainted="PaintsRegions" />
                     </div>
                 }
             </div>
@@ -186,6 +189,8 @@
     private IReadOnlyList<NeighborhoodData> _neighborhoods = [];
     private OperationsSnapshot? _snapshot;
     private IReadOnlyList<MapMarker>? _markers;
+    private IReadOnlyList<RegionSituation> _situations = [];
+    private IReadOnlyList<MapRegion>? _mapRegions;
     private ArgosMap? _map;
     private (ResourceKind Kind, Guid Id)? _selected;
     private string? _error;
@@ -268,6 +273,10 @@
 
             _snapshot = snapshot;
             _markers = OperationsMarkers.From(snapshot);
+
+            // US-17: situação por região no cliente (RN-24) e as mesmas regiões pintadas no mapa; listas novas a cada retrato.
+            _situations = RegionSituations.From(snapshot);
+            _mapRegions = PaintsRegions ? RegionSituations.ToMapRegions(_situations, _regions, Selected(RegionId)) : [];
             _version++;
             Realtime.NoteTelemetry(snapshot.LastTelemetryAt);
         }
@@ -416,6 +425,30 @@
         }));
         return Task.CompletedTask;
     }
+
+    /// <summary>Contador de manutenção (US-16): aplica a necessidade como único filtro; clicar de novo na mesma remove o filtro.</summary>
+    private Task SelectNeedAsync(MaintenanceNeed need)
+    {
+        var current = Parsed<MaintenanceNeed>(MaintenanceNeed);
+        MaintenanceNeed[] values = current.Count == 1 && current.Contains(need) ? [] : [need];
+        return FilterAsync(NeedKey, values);
+    }
+
+    /// <summary>Quadro de regiões (US-17): aplica a região como único filtro; clicar de novo na única filtrada remove o filtro.</summary>
+    private Task SelectRegionAsync(Guid regionId)
+    {
+        Guid[] values = RegionId is [var only] && only == regionId ? [] : [regionId];
+        return FilterAsync(RegionKey, values);
+    }
+
+    /// <summary>
+    /// US-17: o mapa só pinta as regiões com a cidade inteira ou só com o filtro de região (a função do agente não muda a
+    /// classificação). Com um recorte dos equipamentos, a cor descreveria o recorte, e não a região: a cidade ficaria
+    /// "Normal" com alertas críticos abertos fora do filtro. O quadro continua, avisando que reflete os filtros.
+    /// </summary>
+    private bool PaintsRegions =>
+        TypeId is not { Length: > 0 } && Status is not { Length: > 0 } && MaintenanceNeed is not { Length: > 0 }
+        && OrganizationId is not { Length: > 0 } && NeighborhoodId is not { Length: > 0 };
 
     private Task RemoveFilterAsync(ActiveFilter filter)
     {
